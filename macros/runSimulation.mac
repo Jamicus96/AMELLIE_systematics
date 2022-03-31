@@ -1,0 +1,60 @@
+#/**
+#*  Example Macro for generating beams of optical photons from
+#*      the ELLIE array - in this case one of the AMELLIE fibres
+#*/
+
+# Don't care about hadrons or muons so quicker not to initialise these processes
+/rat/physics_list/OmitMuonicProcesses true
+/rat/physics_list/OmitHadronicProcesses true
+
+#store tracking info
+/rat/tracking/store full
+
+# To use simulated external asynch trigger
+/rat/db/set DAQ_RUN_LEVEL trigger_mask 32768
+/rat/db/set DAQ_RUN_LEVEL trigger_enable 35967
+
+/rat/db/set DETECTOR geo_file "geo/YOUR_FAV_GEO_FILE.geo"
+
+# Set the number of photons per beam
+/rat/db/set ELLIE intensity 1250
+
+# calibration
+
+/rat/db/set PMTCAL eca_validation 4
+
+# Choose the TELLIE to fire
+/rat/db/set ELLIE source "YOUR_FAV_LED"
+
+# If using separate vertex and position generators, set the fibres below
+/rat/db/set ELLIE fibre_id "YOUR_FAV_FIBRE"
+
+# these lines show how to change optical parameters
+/rat/db/set OPTICS[te_diol_dda_0p5_labppo_scintillator_bisMSB_Jan2018] ABSLENGTH_SCALING [1.9, 2.0, 2.0, 0.0]
+/rat/db/set OPTICS[te_diol_dda_0p5_labppo_scintillator_bisMSB_Jan2018] RSLENGTH_SCALING [1.3566, 1.3566, 1.3566, 1.3566]
+
+/run/initialize
+
+# BEGIN EVENT LOOP
+/rat/proc frontend
+/rat/proc trigger
+/rat/proc eventbuilder
+/rat/proc pruneTrack
+/rat/procset particle "e-"
+/rat/procset process "cerenkov"
+/rat/proc count
+/rat/procset update 100
+/rat/proc calibratePMT
+/rat/procset eca 1
+/rat/procset pca 1
+/rat/proclast outroot
+#/rat/procset file "/PATH/TO/YOUR/OUTPUT/FILE.root"
+# END EVENTLOOP
+
+# Choose the ELLIE generator
+/generator/add ellie
+/generator/rate/set 1000
+
+# simulate some events
+/rat/run/start 2000
+exit

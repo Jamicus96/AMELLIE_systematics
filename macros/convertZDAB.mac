@@ -1,0 +1,34 @@
+# Date:     2014-12-17
+# Contact:  E Falk <e.falk@sussex.ac.uk>
+# Revisions:    2015-02-05: Use FTB ECA calibrations
+#               2019-03-10: Update to new RAT and generalise
+#
+# This macro applies the PMT calibration to a raw zdab file and converts to root format
+
+# Speed up rat initialisation time (but prevent any simulation)
+/rat/physics_list/OmitAll true
+/rat/db/set DETECTOR geo_file "geo/empty.geo"
+
+# Set ECA tolerance
+/rat/db/set PMTCAL eca_validation 4
+
+# Input file
+/rat/inzdab/load_default
+
+/run/initialize
+
+# BEGIN EVENT LOOP
+/rat/proc count
+/rat/procset update 1000
+/rat/proc calibratePMT
+/rat/procset eca 1
+/rat/procset pca 1
+# END EVENT LOOP
+
+# Output file
+/rat/proclast outroot
+
+# Read input from zdab file
+/rat/inzdab/read
+
+exit
