@@ -151,6 +151,7 @@ std::vector<double> OptimiseDivideAndConquer(std::vector<std::string> traking_fi
                 
                 bestworstFOMPoints[i] = GetBestFOM(FOMs[i], points[i]);
                 if(verbose) std::cout << "Got best FOMs" << std::endl;
+                if(verbose) std::cout << "Best slope: " << bestworstFOMPoints[0] << ", best FOM: " << bestworstFOMPoints[2] << std::endl;
                 
                 points[i] = GetThreePoints(bestworstFOMPoints[i].at(0), bestworstFOMPoints[i].at(1), points[i]);
                 if(verbose) std::cout << "Got new points: " << points[i].at(0) << ", " << points[i].at(1) << ", " << points[i].at(2) << std::endl;
