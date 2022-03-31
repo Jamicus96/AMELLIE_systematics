@@ -91,8 +91,8 @@ std::vector<double> OptimiseDivideAndConquer(std::vector<std::string> traking_fi
     std::string point_names[8] = {"direct_x_c", "direct_y_c", "direct_dx", "direct_dy", "reflected_x_c", "reflected_y_c", "reflected_dx", "reflected_dy"};
     double y_min = hist_lists.at(0).Tracking_Hists().at(0)->GetYaxis()->GetXmin();
     double y_max = hist_lists.at(0).Tracking_Hists().at(0)->GetYaxis()->GetXmax();
-    double point_mins[8] = {-1.0, y_min, 0.1, 0.1, 0.0, y_min, 0.1, 0.1};
-    double point_maxs[8] = {0.0, y_max, 1.0, 0.25 * (y_max - y_min), 0.5, y_max, 0.5, 0.25 * (y_max - y_min)};
+    double point_mins[8] = {-1.0, -20.0, 0.1, 0.1, 0.0, -20.0, 0.1, 0.1};
+    double point_maxs[8] = {0.0, 150.0, 1.0, 50.0, 0.5, 150.0, 0.5, 50.0};
 
     std::vector<double> point_tolerances = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     double xBinWidth = hist_lists.at(0).Tracking_Hists().at(0)->GetXaxis()->GetBinCenter(2) - hist_lists.at(0).Tracking_Hists().at(0)->GetXaxis()->GetBinCenter(1);
