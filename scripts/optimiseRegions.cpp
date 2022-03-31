@@ -332,14 +332,17 @@ std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region
             double yBinCenter = allPathsHist->GetYaxis()->GetBinCenter(y);
             if(direct_region.check_point_inside_rectangle(xBinCenter, yBinCenter)){
                 direct_count += allPathsHist->GetBinContent(x,y);
-                std::cout << "+d" << std::endl;
+                // std::cout << "+d" << std::endl;
             }
             if(reflected_region.check_point_inside_rectangle(xBinCenter, yBinCenter)){
                 reflected_count += allPathsHist->GetBinContent(x,y);
-                std::cout << "+r" << std::endl;
+                // std::cout << "+r" << std::endl;
             }
         }
     }
+
+    std::cout << "direct_count = " << direct_count << std::endl;
+    std::cout << "reflected_count = " << reflected_count << std::endl;
 
     // Compute ratio of both, and associated stat error
     std::vector<double> ratio;
