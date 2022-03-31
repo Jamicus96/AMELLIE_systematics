@@ -151,7 +151,6 @@ std::vector<double> OptimiseDivideAndConquer(std::vector<std::string> traking_fi
                 
                 bestworstFOMPoints[i] = GetBestFOM(FOMs[i], points[i]);
                 if(verbose) std::cout << "Got best FOMs" << std::endl;
-                if(verbose) std::cout << "Best slope: " << bestworstFOMPoints[i].at(0) << ", best FOM: " << bestworstFOMPoints[i].at(2) << std::endl;
                 
                 points[i] = GetThreePoints(bestworstFOMPoints[i].at(0), bestworstFOMPoints[i].at(1), points[i]);
                 if(verbose) std::cout << "Got new points: " << points[i].at(0) << ", " << points[i].at(1) << ", " << points[i].at(2) << std::endl;
@@ -278,12 +277,17 @@ std::vector<double> GetFOMs(std::vector<double> points, std::vector<double> fixe
         reflected_region = rectangle(temp_points[4] + temp_points[6], temp_points[4] - temp_points[6],
                                             temp_points[5] + temp_points[7], temp_points[5] - temp_points[7]);
 
-        ratio_abs1 = getRatio(direct_region, reflected_region, hist_lists.at(abs1_idx).Tracking_Hists().at(0));
+        std::cout << "direc_x_max = " << direct_region.X_max() << ", direct_x_min = " << direct_region.X_min()
+        << ", direct_y_max = " << direct_region.Y_max() << ", direct_y_min = " << direct_region.Y_min() << std::endl;
+        std::cout << "reflected_x_max = " << reflected_region.X_max() << ", reflected_x_min = " << reflected_region.X_min()
+        << ", reflected_y_max = " << reflected_region.Y_max() << ", reflected_y_min = " << reflected_region.Y_min() << std::endl;
+
+        ratio_abs1 = getRatio(direct_region, reflected_region, hist_lists.at(abs1_idx).Tracking_Hists().at(1));
         S_xy = 0.0;
         S_xx = 0.0;
 
         for (unsigned int n = 0; n < N; ++n) {
-            ratio_res = getRatio(direct_region, reflected_region, hist_lists.at(n).Tracking_Hists().at(0));
+            ratio_res = getRatio(direct_region, reflected_region, hist_lists.at(n).Tracking_Hists().at(1));
             if (ratio_res.at(0) == -1.0) {
                 zero = true;
                 break;
@@ -328,9 +332,11 @@ std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region
             double yBinCenter = allPathsHist->GetYaxis()->GetBinCenter(y);
             if(direct_region.check_point_inside_rectangle(xBinCenter, yBinCenter)){
                 direct_count += allPathsHist->GetBinContent(x,y);
+                std::cout << "+d" << std::endl;
             }
             if(reflected_region.check_point_inside_rectangle(xBinCenter, yBinCenter)){
                 reflected_count += allPathsHist->GetBinContent(x,y);
+                std::cout << "+r" << std::endl;
             }
         }
     }
