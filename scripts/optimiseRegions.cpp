@@ -277,10 +277,10 @@ std::vector<double> GetFOMs(std::vector<double> points, std::vector<double> fixe
         reflected_region = rectangle(temp_points[4] + temp_points[6], temp_points[4] - temp_points[6],
                                             temp_points[5] + temp_points[7], temp_points[5] - temp_points[7]);
 
-        std::cout << "direc_x_max = " << direct_region.X_max() << ", direct_x_min = " << direct_region.X_min()
-        << ", direct_y_max = " << direct_region.Y_max() << ", direct_y_min = " << direct_region.Y_min() << std::endl;
-        std::cout << "reflected_x_max = " << reflected_region.X_max() << ", reflected_x_min = " << reflected_region.X_min()
-        << ", reflected_y_max = " << reflected_region.Y_max() << ", reflected_y_min = " << reflected_region.Y_min() << std::endl;
+        // std::cout << "direc_x_max = " << direct_region.X_max() << ", direct_x_min = " << direct_region.X_min()
+        // << ", direct_y_max = " << direct_region.Y_max() << ", direct_y_min = " << direct_region.Y_min() << std::endl;
+        // std::cout << "reflected_x_max = " << reflected_region.X_max() << ", reflected_x_min = " << reflected_region.X_min()
+        // << ", reflected_y_max = " << reflected_region.Y_max() << ", reflected_y_min = " << reflected_region.Y_min() << std::endl;
 
         ratio_abs1 = getRatio(direct_region, reflected_region, hist_lists.at(abs1_idx).Tracking_Hists().at(1));
         S_xy = 0.0;
@@ -341,8 +341,8 @@ std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region
         }
     }
 
-    std::cout << "direct_count = " << direct_count << std::endl;
-    std::cout << "reflected_count = " << reflected_count << std::endl;
+    // std::cout << "direct_count = " << direct_count << std::endl;
+    // std::cout << "reflected_count = " << reflected_count << std::endl;
 
     // Compute ratio of both, and associated stat error
     std::vector<double> ratio;
