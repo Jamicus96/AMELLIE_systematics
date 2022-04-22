@@ -26,7 +26,7 @@ int main(int argc, char** argv){
     std::string str;
     std::vector<std::string> traking_files;
     std::vector<double> abs_scalings;
-    int abs1_idx = -1;
+    int abs1_idx = -1;  // Index in abs_scalings where abs=1.0
     int i = 0;
     while (std::getline(file, str)) {
         // format in info file: geo_file.geo, LEDnum, fibre, reemis, abs
