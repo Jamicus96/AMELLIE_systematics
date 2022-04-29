@@ -17,7 +17,7 @@ std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region
 int main(int argc, char** argv){
     // Read in text file with list of stats that were simulated (different abs, the rest the same for now)
     std::string info_file = argv[1];
-    std::string info_file_repo = argv[2];
+    std::string tracking_hist_repo = argv[2];
     // Read in output filename (txt)
     std::string output_file = argv[3];
     // Read in region limits
@@ -60,9 +60,11 @@ int main(int argc, char** argv){
 
         pos = str_lst.at(0).find(".geo");
         std::string geo_name = str_lst.at(0).substr(0, pos);
-        std::string file_address = info_file_repo + "tot_AMELLIE_" + geo_name + "_" + str_lst.at(1) + "_" + str_lst.at(2) + "_reemis" + str_lst.at(3) + "_abs" + str_lst.at(4) + ".root";
+        std::string file_address = tracking_hist_repo + "tot_AMELLIE_" + geo_name + "_" + str_lst.at(1) + "_" + str_lst.at(2) + "_reemis" + str_lst.at(3) + "_abs" + str_lst.at(4) + ".root";
         traking_files.push_back(file_address);
+        std::cout << file_address << std::endl;
         abs_scalings.push_back(std::stod(str_lst.at(4)));
+        std::cout << std::stod(str_lst.at(4)) << std::endl;
         if (str_lst.at(4) == "1.0" || abs_scalings.at(i) == 1.0) {
             abs1_idx = i;
         }
