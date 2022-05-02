@@ -63,9 +63,9 @@ int main(int argc, char** argv){
         std::string file_address = tracking_hist_repo + "tot_AMELLIE_" + geo_name + "_" + str_lst.at(1) + "_" + str_lst.at(2) + "_reemis" + str_lst.at(3) + "_abs" + str_lst.at(4) + ".root";
         traking_files.push_back(file_address);
         std::cout << file_address << std::endl;
-        abs_scalings.push_back(std::stod(str_lst.at(4)));
-        std::cout << std::stod(str_lst.at(4)) << std::endl;
-        if (str_lst.at(4) == "1.0" || abs_scalings.at(i) == 1.0) {
+        abs_scalings.push_back(std::stod(str_lst.at(3)));
+        std::cout << std::stod(str_lst.at(3)) << std::endl;
+        if (abs_scalings.at(i) == 1.0) {
             abs1_idx = i;
         }
         str_lst.clear();
