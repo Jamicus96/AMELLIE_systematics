@@ -9,7 +9,7 @@
 #include "AMELLIE_utils.hpp"
 
 
-double GetFOM(std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, double points[8]);
+double GetFOMabsSlope(std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, double points[8]);
 std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist);
 
 
@@ -79,8 +79,8 @@ int main(int argc, char** argv){
 
     /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
-    // Get FOM
-    double FOM = GetFOM(traking_files, abs_scalings, abs1_idx, points);
+    // Get FOM/abs slope
+    double y = GetFOMabsSlope(traking_files, abs_scalings, abs1_idx, points);
 
     // Print it to file, after region info
     std::ofstream datafile;
@@ -88,7 +88,7 @@ int main(int argc, char** argv){
     for (int i = 0; i < 8; ++i) {
         datafile << points[i] << " ";
     }
-    datafile << FOM << std::endl;
+    datafile << y << std::endl;
 }
 
 
@@ -98,7 +98,7 @@ int main(int argc, char** argv){
 
 
 /**
- * @brief Returns FOM at abs=1 (not normalised)
+ * @brief Returns FOM/abs slope (called y)
  * 
  * @param traking_files 
  * @param abs_scalings 
@@ -106,7 +106,7 @@ int main(int argc, char** argv){
  * @param points 
  * @return double 
  */
-double GetFOM(std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, double points[8]) {
+double GetFOMabsSlope(std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, double points[8]) {
 
     // Read in histograms
     std::vector<HistList> hist_lists;
@@ -124,7 +124,29 @@ double GetFOM(std::vector<std::string> traking_files, std::vector<double> abs_sc
     // abs = 1 ratio
     std::vector<double> ratio_abs1 = getRatio(direct_region, reflected_region, hist_lists.at(abs1_idx).Tracking_Hists().at(1));
 
-    return ratio_abs1.at(0);  // return FOM at abs=1 (not normalised)
+    double ratio;
+    double ratio_err;
+    double S_xy;
+    double S_xx;
+    std::vector<double> ratio_res = {0.0, 0.0};
+    for (unsigned int n = 0; n < abs_scalings.size(); ++n) {
+        // ratio for other abs
+        ratio_res = getRatio(direct_region, reflected_region, hist_lists.at(n).Tracking_Hists().at(1));
+        if (ratio_res.at(0) == -1.0) {
+            std::cout << "ERROR: Region with no hits :/" << std::endl;
+            exit(1);
+        }
+        ratio = ratio_res.at(0) / ratio_abs1.at(0); // normalise ratio to value at abs=1.0
+        ratio_err = sqrt(((ratio_res.at(1)*ratio_res.at(1)) / (ratio_abs1.at(0)*ratio_abs1.at(0)))
+                                + ((ratio_res.at(0)*ratio_res.at(0) * ratio_abs1.at(1)*ratio_abs1.at(1))
+                                / (ratio_abs1.at(0)*ratio_abs1.at(0)*ratio_abs1.at(0)*ratio_abs1.at(0)))); // update errors accordingly
+
+        // Add to quantities used to find slope (FOM) of ratio vs abs
+        S_xy += ((abs_scalings.at(n) - 1.0) * (ratio - 1.0)) / (ratio_err*ratio_err);
+        S_xx += ((abs_scalings.at(n) - 1.0) * (abs_scalings.at(n) - 1.0)) / (ratio_err*ratio_err);
+    }
+
+    return S_xy / S_xx;  // return best fit slope (FOM)
 }
 
 
