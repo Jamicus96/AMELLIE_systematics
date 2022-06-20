@@ -24,7 +24,7 @@ int main(int argc, char** argv){
     // record extra info?
     bool record_info = std::stoi(argv[4]);
     // Read in region limits
-    double direct_x_max = std::stod(argv[4]);
+    double direct_x_max = std::stod(argv[5]);
     double direct_x_min = std::stod(argv[6]);
     double direct_y_max = std::stod(argv[7]);
     double direct_y_min = std::stod(argv[8]);
