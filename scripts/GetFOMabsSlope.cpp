@@ -14,6 +14,7 @@
 std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool record_info = true);
 std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist);
 void DrawRegionLims(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist, double abs);
+std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file);
 
 
 
@@ -39,52 +40,16 @@ int main(int argc, char** argv){
     rectangle direct_region = rectangle(direct_x_max, direct_x_min, direct_y_max, direct_y_min);
     rectangle reflected_region = rectangle(reflected_x_max, reflected_x_min, reflected_y_max, reflected_y_min);
 
-    /* ~~~~~~~~~ Create list of tracking hist file name from info file, and list abs_scalings ~~~~~~~~~ */
+    //Create list of tracking hist file name from info file, and list abs_scalings
 
-    std::ifstream file(info_file);
-    std::string str;
-    std::vector<std::string> traking_files;
+    std::vector<std::vector<std::string> > file_info = readInfoFile(tracking_hist_repo, info_file);
+
+    std::vector<std::string> traking_files = file_info.at(0);
+    unsigned int abs1_idx = std::stoi(file_info.at(2).at(0));
     std::vector<double> abs_scalings;
-    int abs1_idx = -1;  // Index in abs_scalings where abs=1.0
-    int i = 0;
-    while (std::getline(file, str)) {
-        // format in info file: geo_file.geo, LEDnum, fibre, reemis, abs
-        // format in tracking hist file name: tot_AMELLIE_geoFile_LEDnum_fibre_reemis_abs.root
-        std::vector<std::string> str_lst;
-        std::size_t pos;
-        std::string delimiter = ", ";
-        bool splitting = true;
-        while (splitting) {
-            pos = str.find(delimiter);
-            if ((unsigned int)pos < str.size()) {
-                str_lst.push_back(str.substr(0, pos));
-                str = str.substr(pos + delimiter.size());
-            } else {
-                splitting = false;
-            }
-        }
-        str_lst.push_back(str);
-
-        pos = str_lst.at(0).find(".geo");
-        std::string geo_name = str_lst.at(0).substr(0, pos);
-        std::string file_address = tracking_hist_repo + "tot_AMELLIE_" + geo_name + "_" + str_lst.at(1) + "_" + str_lst.at(2) + "_reemis" + str_lst.at(3) + "_abs" + str_lst.at(4) + ".root";
-        traking_files.push_back(file_address);
-        std::cout << file_address << std::endl;
-        abs_scalings.push_back(std::stod(str_lst.at(4)));
-        std::cout << std::stod(str_lst.at(4)) << std::endl;
-        if (abs_scalings.at(i) == 1.0) {
-            abs1_idx = i;
-        }
-        str_lst.clear();
-        ++i;
+    for (unsigned int i = 0; i < file_info.size(); ++i) {
+        abs_scalings.push_back(std::stod(file_info.at(1).at(i)));
     }
-
-    if (abs1_idx == -1) {
-        std::cout << "ERROR: Absorption 1.0 case not found." << std::endl;
-        exit(1);
-    }
-
-    /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
     // Get FOM/abs slope + FOM points
     std::vector<std::vector<double> > results = GetFOMabsSlope(direct_region, reflected_region, traking_files, abs_scalings, abs1_idx, record_info);
@@ -110,8 +75,6 @@ int main(int argc, char** argv){
 }
 
 
-
-/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
 
@@ -273,4 +236,70 @@ void DrawRegionLims(rectangle direct_region, rectangle reflected_region, TH2F *a
 
     c1->Write();
     delete c1;
+}
+
+
+/**
+ * @brief Reads information from text file with simulation info into.
+ * 
+ * @param info_file 
+ * @return std::vector<std::string> {traking_files, abs_scalings, abs1_idx}
+ */
+std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file) {
+
+    std::ifstream file(info_file);
+    std::string str;
+    std::string geo_file;  // sans the ".geo" part
+    std::string wavelength;  // nm
+    std::string fibre;
+    std::string reemission;  // reemission fraction of absorbed light
+    std::vector<std::string> abs_scalings;  // absorption coefficient normalised so that 1.0 = current value
+    std::vector<std::string> traking_files;
+    std::vector<std::string> abs1_idx = {"-1"};  // Index in abs_scalings where abs=1.0
+
+    int i = 0;
+    std::string delimiter = ", ";
+    std::size_t pos;
+    std::string substr;
+    std::string full_geo;
+    while (std::getline(file, str)) {
+        // format in info file: geo_file.geo, LEDnum, fibre, reemis, abs
+        // format in tracking hist file name: tot_AMELLIE_geoFile_LEDnum_fibre_reemis_abs.root
+        
+        pos = str.find(delimiter);
+        substr = str.substr(0, pos);
+        full_geo = str.substr(0, pos);
+        pos = full_geo.find(".geo");
+        geo_file = full_geo.substr(0, pos);
+        str = str.substr(pos + delimiter.size());
+
+        pos = str.find(delimiter);
+        substr = str.substr(0, pos);
+        wavelength = str.substr(0, pos);
+        str = str.substr(pos + delimiter.size());
+
+        pos = str.find(delimiter);
+        substr = str.substr(0, pos);
+        fibre = str.substr(0, pos);
+        str = str.substr(pos + delimiter.size());
+
+        pos = str.find(delimiter);
+        substr = str.substr(0, pos);
+        reemission = str.substr(0, pos);
+        str = str.substr(pos + delimiter.size());
+
+        abs_scalings.push_back(str);
+        traking_files.push_back(tracking_hist_repo + "tot_AMELLIE_" + geo_file + "_" + wavelength + "_" + fibre + "_reemis" + reemission + "_abs" + str + ".root");
+
+        if (std::stof(str) == 1.0) {abs1_idx.at(0) = std::to_string(i);}  // found absorption=1 case
+        ++i;
+    }
+
+    if (abs1_idx.at(0) == "-1") {
+        std::cout << "ERROR: Absorption 1.0 case not found." << std::endl;
+        exit(1);
+    }
+
+    std::vector<std::vector<std::string> > results = {traking_files, abs_scalings, abs1_idx};
+    return results;
 }
