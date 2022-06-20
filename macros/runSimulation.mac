@@ -48,7 +48,7 @@
 /rat/procset eca 1
 /rat/procset pca 1
 /rat/proclast outroot
-#/rat/procset file "/PATH/TO/YOUR/OUTPUT/FILE.root"
+/rat/procset file "/PATH/TO/YOUR/OUTPUT/FILE.root"
 # END EVENTLOOP
 
 # Choose the ELLIE generator
