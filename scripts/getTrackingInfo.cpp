@@ -6,20 +6,13 @@
 #include "RAT/DU/Utility.hh"
 #include "RAT/DS/Run.hh"
 #include "RAT/DS/Entry.hh"
-#include "RAT/DS/MC.hh"
-#include <RAT/PhysicsUtil.hh>
 #include <TH2F.h>
 #include <TH1F.h>
 #include <TF1.h>
 #include <TMath.h>
 #include <TFile.h>
-#include <RAT/TrackNav.hh>
-#include <RAT/TrackCursor.hh>
-#include <RAT/TrackNode.hh>
-#include <RAT/DS/MCPhoton.hh>
 #include <TVector.h>
 #include <TGraph2D.h>
-#include <regex>
 
 
 int GetLightPaths(std::string file, std::string fibre, double wavelength, bool verbose);
@@ -46,7 +39,8 @@ void GetLightPaths(std::string file, std::string fibre, double wavelength, bool 
 
     // Initialise variables and histograms
     int pmtcount = 0;
-    double locality = 10.0; // lpc sensitivity
+    //double locality = 10.0; // lpc sensitivity
+    double locality = 0.0; // lpc sensitivity
     double energy = RAT::util::WavelengthToEnergy(wavelength);
 
     // get file name from path+filename string
@@ -81,6 +75,7 @@ void GetLightPaths(std::string file, std::string fibre, double wavelength, bool 
     size_t entryCount = dsreader.GetEntryCount(); //number of entries, want to loop over each one
     std::vector<Double_t> evPMTTimes;
     std::vector<UInt_t> pmtID;
+    std::vector<Double_t> cosTheta;
     int index = 0;
     if(verbose) {std::cout << "No of entries in run: " << entryCount << " events" << std::endl;}
     for (size_t iEntry = 0; iEntry < entryCount; ++iEntry) {
@@ -100,11 +95,16 @@ void GetLightPaths(std::string file, std::string fibre, double wavelength, bool 
             for (size_t i_evpmt = 0; i_evpmt < calPMT_count; ++i_evpmt) {
                 // calculate time residuals (not ajusted for peak hit time yet), to fit gaussian
                 const RAT::DS::PMTCal& pmtCal = calPMTs.GetPMT(i_evpmt);
+
                 // Check if PMT passes data cleaning
                 if (PMTCalStatus.GetHitStatus(pmtCal) != 0) {continue;}
+
+                // Get PMT ID, angle (cos(theta)) and residual hit time
                 pmtID.push_back(pmtCal.GetID());
-                evPMTTimes.push_back(fTRCalc.CalcTimeResidual(pmtCal, fibrePos, 0.0));  // set event time to zero for now. Will subtract in hist later.
-                h1DResTimeAll_raw->Fill(evPMTTimes[index]);
+                TVector3 pmtPos = pmtinfo.GetPosition(pmtID.at(index));       // position [mm]
+                cosTheta.push_back((fibrePos * pmtPos)/(fibrePos.Mag() * pmtPos.Mag()));
+                evPMTTimes.push_back(fTRCalc.CalcTimeResidual(pmtCal, fibrePos, 0.0, true, energy, false, locality));  // set event time to zero for now. Will subtract in hist later.
+                h1DResTimeAll->Fill(evPMTTimes[index]);
                 ++index;
             }            
         }
