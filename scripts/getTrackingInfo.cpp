@@ -6,6 +6,7 @@
 #include "RAT/DU/Utility.hh"
 #include "RAT/DS/Run.hh"
 #include "RAT/DS/Entry.hh"
+#include <RAT/PhysicsUtil.hh>
 #include <TH2F.h>
 #include <TH1F.h>
 #include <TF1.h>
@@ -15,13 +16,13 @@
 #include <TGraph2D.h>
 
 
-int GetLightPaths(std::string file, std::string fibre, double wavelength, bool verbose);
+void GetLightPaths(std::string file, std::string fibre, double wavelength, bool verbose);
 
 
 int main(int argc, char** argv){
     std::string file = argv[1];
     std::string fibre = argv[2];
-    double wavelength = stod(argv[3]);
+    double wavelength = std::stod(argv[3]);
     bool verbose = std::stoi(argv[4]);
     GetLightPaths(file, fibre, wavelength, verbose);
     return 0;

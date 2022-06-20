@@ -36,7 +36,7 @@ class rectangle {
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
 
-TH2F* GetHist(std::string root_filename);
+TH2F* GetHist(std::string root_filename, std::string hist_name = "hPmtResTimeVsCosTheta");
 
 //end header guard
 #endif

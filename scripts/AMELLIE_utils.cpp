@@ -43,16 +43,16 @@ bool rectangle::check_point_inside_rectangle(const double point_x, const double 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
 
-TH2F* GetHist(std::string root_filename, std::string hist_name = "hPmtResTimeVsCosTheta") {
+TH2F* GetHist(std::string root_filename, std::string hist_name) {
     // Read in root file
-    TFile* fin = new TFile(tracking_file.c_str());
+    TFile* fin = new TFile(root_filename.c_str());
     if (!fin->IsOpen()) {
-        std::cout << "Cannot open input file " << tracking_file << std::endl;
+        std::cout << "Cannot open input file " << root_filename << std::endl;
         exit(1);
     }
 
     // Get histogram
-    TH2F* h = (TH2F*)fin.Get(hist_name.c_str());
+    TH2F* h = (TH2F*)fin->Get(hist_name.c_str());
 
     return h;
 }
