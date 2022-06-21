@@ -3,6 +3,7 @@ import numpy as np
 import argparse
 import subprocess
 import json
+import time
 
 
 def argparser():
@@ -40,6 +41,8 @@ def argparser():
     return args
 
 
+### Miscelaneous functions ###
+
 def checkRepo(repo_address, verbose=False):
     '''Check format of repo address is right to be used here. Also if repo does not exist, create it.'''
 
@@ -59,59 +62,21 @@ def checkRepo(repo_address, verbose=False):
 
     return new_address
 
+def filename_format(info):
+    '''returns string with simulation info to use in filenames'''
+    # geo_file[:-4] + '_' + wavelength + '_' + fibre + 'reemis' + reemis + '_abs' + abs
+    return 'AMELLIE_' + info[0][:-4] + '_' + info[1] + '_' + info[2] + 'reemis' + info[3] + '_abs' + info[4]
 
-def makeMacros(example_macro, save_macro_folder, save_sims_folder, abs_nominal, geo_file, wavelength, fibre, reemis, abs, nevts, idx):
-    '''Make and save macro according to provided parameters'''
-
-    # Modify by factor abs_scaling_fact
-    abs_scaling_fact = float(abs)
-    abs_scaling = '[' + str(abs_nominal[0] * abs_scaling_fact)
-    abs_scaling += ', ' + str(abs_nominal[1] * abs_scaling_fact)
-    abs_scaling += ', ' + str(abs_nominal[2] * abs_scaling_fact)
-    abs_scaling += ', ' + str(abs_nominal[3] * abs_scaling_fact) + ']'
-
-    # AMELLIE_geoFile_LEDnum_fibre_reemis_abs.root
-    new_macro_address = save_macro_folder + 'AMELLIE_' + geo_file[:-4] + '_' + wavelength + '_' + fibre + 'reemis' + reemis + '_abs' + abs + '_' + idx + '.mac'
-    output_address = save_sims_folder + 'AMELLIE_' + geo_file[:-4] + '_' + wavelength + '_' + fibre + 'reemis' + reemis + '_abs' + abs + '_' + idx + '.root'
-
-    new_macro = []
-    for line in example_macro:
-        # Replace placeholders in macro
-        if 'geo/YOUR_FAV_GEO_FILE.geo' in line:
-            new_line = line.replace('YOUR_FAV_GEO_FILE.geo', geo_file, 1)
-        elif 'YOUR_FAV_LED' in line:
-            new_line = line.replace('YOUR_FAV_LED', wavelength, 1)
-        elif 'YOUR_FAV_FIBRE' in line:
-            new_line = line.replace('YOUR_FAV_FIBRE', fibre, 1)
-        elif '/PATH/TO/YOUR/OUTPUT/FILE.root' in line:
-            new_line = line.replace('/PATH/TO/YOUR/OUTPUT/FILE.root', output_address, 1)
-        elif '/rat/run/start 2000' in line:
-            new_line = line.replace('/rat/run/start 2000', '/rat/run/start ' + nevts, 1)
-        elif 'ABSLENGTH_SCALING [1.9, 2.0, 2.0, 0.0]' in line:
-            new_line = line.replace('[1.9, 2.0, 2.0, 0.0]', abs_scaling, 1)
-        else:
-            new_line = line
-
-        new_macro.append(new_line)
-    
-    # Create new macro file
-    with open(new_macro_address, "w") as f:
-        new_macro = "".join(new_macro)
-        f.write(new_macro)
-
-    return new_macro_address
-
-
-def makeJobScript(example_jobScript, save_macro_folder, commandList_address, geo_file, wavelength, fibre, reemis, abs, verbose):
+def makeJobArrayScript(example_jobScript, overall_folder, commandList_address, info, verbose):
     '''Create job script to run array of rat macros'''
 
-    new_job_address = save_macro_folder + 'jobs_scripts/'
+    new_job_address = overall_folder + 'jobs_scripts/'
     new_job_address = checkRepo(new_job_address, verbose)
-    new_job_address += 'AMELLIE_jobScript_' + geo_file[:-4] + '_' + wavelength + '_' + fibre + 'reemis' + reemis + '_abs' + abs + '.job'
+    new_job_address += 'jobScript_' + filename_format(info) + '.job'
 
-    output_logFile_address = save_macro_folder + 'log_files/'
+    output_logFile_address = overall_folder + 'log_files/'
     output_logFile_address = checkRepo(output_logFile_address, verbose)
-    output_logFile_address +=  'AMELLIE_output_log_' + geo_file[:-4] + '_' + wavelength + '_' + fibre + 'reemis' + reemis + '_abs' + abs + '.txt'
+    output_logFile_address +=  'output_log_' + filename_format(info) + '.txt'
 
     new_jobScript = []
     for line in example_jobScript:
@@ -132,6 +97,59 @@ def makeJobScript(example_jobScript, save_macro_folder, commandList_address, geo
 
     return new_job_address
 
+def getNevtsPerMacro(nevts_total, nevts_persim):
+    '''Create array with number of events to simulate per macro'''
+
+    n_macros = nevts_total // nevts_persim
+    remainder = nevts_total % nevts_persim
+    n_evts = np.an_array = np.full(n_macros + 1, nevts_persim)
+    n_evts[n_macros] = remainder
+
+    return n_evts
+
+
+### Simulation functions ###
+
+def makeMacros(example_macro, save_macro_folder, save_sims_folder, abs_nominal, info, nevts, idx):
+    '''Make and save macro according to provided parameters'''
+
+    # Modify by factor abs_scaling_fact
+    abs_scaling_fact = float(abs)
+    abs_scaling = '[' + str(abs_nominal[0] * abs_scaling_fact)
+    abs_scaling += ', ' + str(abs_nominal[1] * abs_scaling_fact)
+    abs_scaling += ', ' + str(abs_nominal[2] * abs_scaling_fact)
+    abs_scaling += ', ' + str(abs_nominal[3] * abs_scaling_fact) + ']'
+
+    # AMELLIE_geoFile_LEDnum_fibre_reemis_abs.root
+    new_macro_address = save_macro_folder + 'macro_' + filename_format(info) + '_' + str(idx) + '.mac'
+    output_address = save_sims_folder + 'simOut_' + filename_format(info) + '_' + str(idx) + '.root'
+
+    new_macro = []
+    for line in example_macro:
+        # Replace placeholders in macro
+        if 'geo/YOUR_FAV_GEO_FILE.geo' in line:
+            new_line = line.replace('YOUR_FAV_GEO_FILE.geo', info[0], 1)
+        elif 'YOUR_FAV_LED' in line:
+            new_line = line.replace('YOUR_FAV_LED', info[1], 1)
+        elif 'YOUR_FAV_FIBRE' in line:
+            new_line = line.replace('YOUR_FAV_FIBRE', info[2], 1)
+        elif '/PATH/TO/YOUR/OUTPUT/FILE.root' in line:
+            new_line = line.replace('/PATH/TO/YOUR/OUTPUT/FILE.root', output_address, 1)
+        elif '/rat/run/start 2000' in line:
+            new_line = line.replace('/rat/run/start 2000', '/rat/run/start ' + nevts, 1)
+        elif 'ABSLENGTH_SCALING [1.9, 2.0, 2.0, 0.0]' in line:
+            new_line = line.replace('[1.9, 2.0, 2.0, 0.0]', abs_scaling, 1)
+        else:
+            new_line = line
+
+        new_macro.append(new_line)
+    
+    # Create new macro file
+    with open(new_macro_address, "w") as f:
+        new_macro = "".join(new_macro)
+        f.write(new_macro)
+
+    return new_macro_address
 
 def runSims(args, input_info):
     '''Runs AMELLIE simulations based in input information'''
@@ -143,7 +161,7 @@ def runSims(args, input_info):
     with open(macro_address, "r") as f:
         example_macro = f.readlines()
 
-    jobScript_address = repo_address + 'job_scripts/runSims.job'
+    jobScript_address = repo_address + 'job_scripts/jobArray.job'
     with open(jobScript_address, "r") as f:
         example_jobScript = f.readlines()
 
@@ -151,39 +169,36 @@ def runSims(args, input_info):
     save_macro_folder = checkRepo(args.macro_repo, args.verbose)
     save_sims_folder = checkRepo(args.sim_repo, args.verbose)
 
+    # Folder for job scripts and command lists they use
+    jobScript_repo = save_macro_folder + 'job_scripts/'
+    jobScript_repo = checkRepo(jobScript_repo, args.verbose)
+
     # Nominal ABSLENGTH_SCALING (see rat/data/OPTICS_TeDiol_0p5_bismsb_dda.ratdb)
     abs_nominal = [0.95, 1.0, 1.0, 2.3]  #(fyi for ABSLENGTH_SCALING: 0 = LAB, 1 = PPO, 2 = Te-Diol, 3 = bisMSB)
 
     # How to split up sims into manageable macros
-    n_macros = args.nevts_total // args.nevts_persim
-    remainder = args.nevts_total % args.nevts_persim
-    n_evts = np.an_array = np.full(n_macros + 1, args.nevts_persim)
-    n_evts[n_macros] = remainder
-
-    # Folder for job scripts and command lists they use
-    jobScript_repo = save_macro_folder + 'job_scripts/'
-    jobScript_repo = checkRepo(jobScript_repo, args.verbose)
+    n_evts = getNevtsPerMacro(args.nevts_total, args.nevts_persim)
     
     ### MAKE MACROS AND JOB SCRIPTS TO RUN THE SIMULATIONS ###
     print('Creating macros and job scripts...')
     job_addresses = []
     #random_seed = '-1829418327'  # option to make sure all sims have the same random seed, to isolate changes
-    for geo_file, wavelength, fibre, reemis, abs in input_info:
+    for info in input_info:
         if args.verbose:
-            print('geo_file=', geo_file, ', wavelength=', wavelength, ', fibre=', fibre, ', reemis=', reemis, ', abs=', abs)
+            print('geo_file=', info[0], ', wavelength=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
         # Make list of commands for job array to call
-        commandList_address = jobScript_repo + 'AMELLIE_commandList_' + geo_file[:-4] + '_' + wavelength + '_' + fibre + 'reemis' + reemis + '_abs' + abs + '_' + str(i) + '.root'
+        commandList_address = jobScript_repo + 'sim_commandList_' + filename_format(info) + '_' + str(i) + '.root'
         commandList_file = open(commandList_address, 'w')
         for i in range(n_evts):
             # Create all the macros
-            new_macro_address = makeMacros(example_macro, save_macro_folder, save_sims_folder, abs_nominal, geo_file, wavelength, fibre, reemis, abs, n_evts[i], i)
+            new_macro_address = makeMacros(example_macro, save_macro_folder, save_sims_folder, abs_nominal, info, n_evts[i], i)
             #macro_addresses.append(new_macro_address)
             macro_command = 'rat ' + new_macro_address #+ ' -s ' + random_seed
             commandList_file.write(macro_command + '\n')
         commandList_file.close()
 
         # Create the job script to run all these macros in an array
-        new_job_address = makeJobScript(example_jobScript, save_macro_folder, commandList_address, geo_file, wavelength, fibre, reemis, abs, args.verbose)
+        new_job_address = makeJobArrayScript(example_jobScript, save_macro_folder, commandList_address, info, args.verbose)
         job_addresses.append(new_job_address)
         
     if len(n_evts) != len(job_addresses):
@@ -202,6 +217,68 @@ def runSims(args, input_info):
 
     return True
 
+
+### Histogram functions ###
+
+def getHists(args, input_info):
+    '''Get histograms from split up simulation outputs, and recombine them'''
+
+    # Read in example macro and job script + info
+    repo_address = __file__[:-len('scripts/runAMMELIE.py')]
+
+    jobScript_address = repo_address + 'job_scripts/jobArray.job'
+    with open(jobScript_address, "r") as f:
+        example_jobScript = f.readlines()
+
+    # Make sure folders are of the correct format to  use later
+    save_sims_folder = checkRepo(args.sim_repo, args.verbose)
+    save_hists_folder = checkRepo(args.hist_repo, args.verbose)
+
+    # Folder for job scripts and command lists they use
+    jobScript_repo = save_sims_folder + 'job_scripts/'
+    jobScript_repo = checkRepo(jobScript_repo, args.verbose)
+
+    # How to split up sims into manageable macros
+    n_evts = getNevtsPerMacro(args.nevts_total, args.nevts_persim)
+
+    ### Check that all simulations have finished running ###
+    running = True
+    while running:
+        running = False
+        output = subprocess.Popen('qstat -u $USER', stdout=subprocess.PIPE).communicate()[0]
+        lines = output.decode("utf-8").split('\n')
+        for line in lines:
+            if running:
+                break
+            else:
+                for info in input_info:
+                    if 'jobScript_' + filename_format(info) in line:
+                        running = True
+                        break
+        time.wait(10)
+
+    ### MAKE JOB SCRIPTS TO CREATE HISTOGRAMS ###
+    print('Creating macros and job scripts...')
+    hist_command_base = repo_address + 'scripts/./GetHists.exe ' + save_sims_folder
+    job_addresses = []
+    for info in input_info:
+        if args.verbose:
+            print('geo_file=', info[0], ', wavelength=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
+        # Make list of commands for job array to call
+        commandList_address = jobScript_repo + 'hist_commandList_' + filename_format(info) + '_' + str(i) + '.root'
+        commandList_file = open(commandList_address, 'w')
+        for i in range(n_evts):
+            # Create all the histogram making commands
+            hist_command = hist_command_base + 'simOut_' + filename_format(info) + '_' + str(i) + '.root ' + info[2] + ' ' + info[1] + ' ' + int(args.verbose)
+            commandList_file.write(hist_command + '\n')
+        commandList_file.close()
+
+        # Create the job script to run all these macros in an array
+        new_job_address = makeJobArrayScript(example_jobScript, save_macro_folder, commandList_address, info, args.verbose)
+        job_addresses.append(new_job_address)
+
+
+### MAIN ###
 
 def main():
     # read in argument
