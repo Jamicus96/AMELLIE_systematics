@@ -17,8 +17,10 @@ def argparser():
                         default='/mnt/lustre/scratch/epp/jp643/AMELLIE/macros/', help='Folder to save Region-selected root files in.')
     parser.add_argument('--sim_repo', '-sir', type=str, dest='sim_repo',
                         default='/mnt/lustre/scratch/epp/jp643/AMELLIE/sims/', help='Folder to save intial root files from AMELLIE simulations in.')
-    parser.add_argument('--hist_repo', '-hir', type=str, dest='hist_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/hists/', help='Folder to save root files with tracking information in.')
+    parser.add_argument('--splithist_repo', '-shir', type=str, dest='splithist_repo',
+                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/split_hists/', help='Folder to save uncombined root files with tracking information in.')
+    parser.add_argument('--tothist_repo', '-thir', type=str, dest='tothist_repo',
+                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/tot_hists/', help='Folder to save recombined root files with tracking information in.')
     parser.add_argument('--stats_repo', '-str', type=str, dest='stats_repo',
                         default='/mnt/lustre/scratch/epp/jp643/AMELLIE/stats/', help='Folder to save stats txt files in.')
 
@@ -26,6 +28,9 @@ def argparser():
                         default=1000, help='Number of events to simulate for each setting, total')
     parser.add_argument('--nevts_persim', '-n', type=int, dest='nevts_persim',
                         default=500, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
+    parser.add_argument('--region_lims', '-r', type=list, dest='region_lims',
+                        default=[-0.95, 0.85, -0.95, 20,  -4, 20],
+                        help='List of region limits: [direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy]')
 
     parser.add_argument('--list', '-l', type=str, dest='list_file',
                         default='list.txt', help='Text file with list of sim stats. Format per line:\n\
@@ -67,16 +72,16 @@ def filename_format(info):
     # geo_file[:-4] + '_' + wavelength + '_' + fibre + 'reemis' + reemis + '_abs' + abs
     return 'AMELLIE_' + info[0][:-4] + '_' + info[1] + '_' + info[2] + 'reemis' + info[3] + '_abs' + info[4]
 
-def makeJobArrayScript(example_jobScript, overall_folder, commandList_address, info, verbose):
+def makeJobArrayScript(jobName_substr, example_jobScript, overall_folder, commandList_address, info, verbose):
     '''Create job script to run array of rat macros'''
 
     new_job_address = overall_folder + 'jobs_scripts/'
     new_job_address = checkRepo(new_job_address, verbose)
-    new_job_address += 'jobScript_' + filename_format(info) + '.job'
+    new_job_address += jobName_substr + 'jobScript_' + filename_format(info) + '.job'
 
     output_logFile_address = overall_folder + 'log_files/'
     output_logFile_address = checkRepo(output_logFile_address, verbose)
-    output_logFile_address +=  'output_log_' + filename_format(info) + '.txt'
+    output_logFile_address +=  jobName_substr + 'output_log_' + filename_format(info) + '.txt'
 
     new_jobScript = []
     for line in example_jobScript:
@@ -85,6 +90,36 @@ def makeJobArrayScript(example_jobScript, overall_folder, commandList_address, i
             new_line = line.replace('output_log.txt', output_logFile_address, 1)
         elif 'Command here' in line:
             new_line = line.replace('/Address/CommandList.txt', commandList_address, 1)
+        else:
+            new_line = line
+
+        new_jobScript.append(new_line)
+
+    # Create job file
+    with open(new_job_address, "w") as f:
+        new_jobScript = "".join(new_jobScript)
+        f.write(new_jobScript)
+
+    return new_job_address
+
+def makeJobSingleScript(jobName_substr, example_jobScript, overall_folder, commands, info, verbose):
+    '''Create job script to run array of rat macros'''
+
+    new_job_address = overall_folder + 'jobs_scripts/'
+    new_job_address = checkRepo(new_job_address, verbose)
+    new_job_address += jobName_substr + 'jobScript_' + filename_format(info) + '.job'
+
+    output_logFile_address = overall_folder + 'log_files/'
+    output_logFile_address = checkRepo(output_logFile_address, verbose)
+    output_logFile_address +=  jobName_substr + 'output_log_' + filename_format(info) + '.txt'
+
+    new_jobScript = []
+    for line in example_jobScript:
+        # Replace placeholders in macro
+        if 'output_log.txt' in line:
+            new_line = line.replace('output_log.txt', output_logFile_address, 1)
+        elif 'Command here' in line:
+            new_line = line.replace('your commands', commands, 1)
         else:
             new_line = line
 
@@ -106,6 +141,26 @@ def getNevtsPerMacro(nevts_total, nevts_persim):
     n_evts[n_macros] = remainder
 
     return n_evts
+
+def checkJobsDone(jobName_substr, input_info, wait_time):
+    '''Wait until submitted jobs of certain forma are finished. Wait time in seconds.'''
+
+    running = True
+    while running:
+        running = False
+        output = subprocess.Popen('qstat -u $USER', stdout=subprocess.PIPE).communicate()[0]
+        lines = output.decode("utf-8").split('\n')
+        for line in lines:
+            if running:
+                break
+            else:
+                for info in input_info:
+                    if jobName_substr + filename_format(info) in line:
+                        running = True
+                        break
+        time.wait(wait_time)
+
+    return True
 
 
 ### Simulation functions ###
@@ -198,7 +253,7 @@ def runSims(args, input_info):
         commandList_file.close()
 
         # Create the job script to run all these macros in an array
-        new_job_address = makeJobArrayScript(example_jobScript, save_macro_folder, commandList_address, info, args.verbose)
+        new_job_address = makeJobArrayScript('sims_', example_jobScript, save_macro_folder, commandList_address, info, args.verbose)
         job_addresses.append(new_job_address)
         
     if len(n_evts) != len(job_addresses):
@@ -232,7 +287,8 @@ def getHists(args, input_info):
 
     # Make sure folders are of the correct format to  use later
     save_sims_folder = checkRepo(args.sim_repo, args.verbose)
-    save_hists_folder = checkRepo(args.hist_repo, args.verbose)
+    save_splithists_folder = checkRepo(args.splithist_repo, args.verbose)
+    save_tothists_folder = checkRepo(args.tothist_repo, args.verbose)
 
     # Folder for job scripts and command lists they use
     jobScript_repo = save_sims_folder + 'job_scripts/'
@@ -242,24 +298,11 @@ def getHists(args, input_info):
     n_evts = getNevtsPerMacro(args.nevts_total, args.nevts_persim)
 
     ### Check that all simulations have finished running ###
-    running = True
-    while running:
-        running = False
-        output = subprocess.Popen('qstat -u $USER', stdout=subprocess.PIPE).communicate()[0]
-        lines = output.decode("utf-8").split('\n')
-        for line in lines:
-            if running:
-                break
-            else:
-                for info in input_info:
-                    if 'jobScript_' + filename_format(info) in line:
-                        running = True
-                        break
-        time.wait(10)
+    checkJobsDone('sims_jobScript_', filename_format(info), 10)
 
     ### MAKE JOB SCRIPTS TO CREATE HISTOGRAMS ###
     print('Creating macros and job scripts...')
-    hist_command_base = repo_address + 'scripts/./GetHists.exe ' + save_sims_folder
+    hist_command_base = repo_address + 'scripts/./GetHists.exe '
     job_addresses = []
     for info in input_info:
         if args.verbose:
@@ -269,13 +312,111 @@ def getHists(args, input_info):
         commandList_file = open(commandList_address, 'w')
         for i in range(n_evts):
             # Create all the histogram making commands
-            hist_command = hist_command_base + 'simOut_' + filename_format(info) + '_' + str(i) + '.root ' + info[2] + ' ' + info[1] + ' ' + int(args.verbose)
+            hist_command = hist_command_base + save_sims_folder + 'simOut_' + filename_format(info) + '_' + str(i) + '.root '\
+                                             + save_splithists_folder + 'splitHist_' + filename_format(info) + '_' + str(i) + '.root '\
+                                             + info[2] + ' ' + info[1] + ' ' + int(args.verbose)
             commandList_file.write(hist_command + '\n')
         commandList_file.close()
 
         # Create the job script to run all these macros in an array
-        new_job_address = makeJobArrayScript(example_jobScript, save_macro_folder, commandList_address, info, args.verbose)
+        new_job_address = makeJobArrayScript('hists_', example_jobScript, save_tothists_folder, commandList_address, info, args.verbose)
         job_addresses.append(new_job_address)
+
+    if len(n_evts) != len(job_addresses):
+        print('ERROR: Number of job scripts does not match number needed to run macros')
+        print('len(n_evts) = ', len(n_evts), ', len(job_addresses) = ', len(job_addresses))
+        exit()
+
+
+    ### RUN JOB SCRIPTS ###
+    print('Submitting jobs...')
+    for i in range(len(n_evts)):
+        command = 'qsub -t 1-' + str(n_evts[i]) + ' ' + job_addresses[i] 
+        if args.verbose:
+            print('Running command: ', command)
+        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+
+    # Wait until these job arrays are done
+    checkJobsDone('hists_jobScript_', filename_format(input_info), 10)
+
+    ### COMBINE SPLIT UP HISTS ###
+    print('Combining hists...')
+    combi_command_base = 'hadd tot_hists_'
+    current_wd = os.getcwd()
+    os.chdir(save_splithists_folder)
+    for info in input_info:
+        command = combi_command_base + filename_format(info) + '.root hists_' + filename_format(info) + '_*.root'
+        if args.verbose:
+            print('Running command: ', command)
+        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+
+    return True
+
+
+### Analysis functions ###
+
+def getSlopes(args, input_info):
+    '''Compute slope from FOM computed from different absorption scalings'''
+
+    # Read in example macro and job script + info
+    repo_address = __file__[:-len('scripts/runAMMELIE.py')]
+
+    jobScript_address = repo_address + 'job_scripts/jobSingle.job'
+    with open(jobScript_address, "r") as f:
+        example_jobScript = f.readlines()
+
+    # Make sure folders are of the correct format to  use later
+    save_tothists_folder = checkRepo(args.tothist_repo, args.verbose)
+    save_stats_folder = checkRepo(args.stats_repo, args.verbose)
+
+    # Folder for job scripts and command lists they use
+    jobScript_repo = save_tothists_folder + 'job_scripts/'
+    jobScript_repo = checkRepo(jobScript_repo, args.verbose)
+
+    ### Check that all simulations have finished running ###
+    # checkJobsDone('sims_jobScript_', filename_format(info), 10)
+
+    # Package region limits in string format to use in commands
+    # args.region_lims = [direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy]
+    direct_x_max = args.region_lims[0]
+    direct_x_min = -1.0
+    direct_y_max = args.region_lims[2] + 0.5 * args.region_lims[3]
+    direct_y_min = args.region_lims[2] - 0.5 * args.region_lims[3]
+    reflected_x_max = 1.0
+    reflected_x_min = args.region_lims[1]
+    reflected_y_max = args.region_lims[4] + 0.5 * args.region_lims[5]
+    reflected_y_min = args.region_lims[0] - 0.5 * args.region_lims[5]
+    region_lims = str(direct_x_max) + ' ' + str(direct_x_min) + ' ' + str(direct_y_max) + ' ' + str(direct_y_min) + ' '\
+                + str(reflected_x_max) + ' ' + str(reflected_x_min) + ' ' + str(reflected_y_max) + ' ' + str(reflected_y_min)
+
+    ### MAKE JOB SCRIPTS TO RUN ANALYSIS ###
+    print('Creating macros and job scripts...')
+    slope_command_base = repo_address + 'scripts/./GetFOMabsSlope.exe '
+    job_addresses = []
+    for info in input_info:
+        if args.verbose:
+            print('geo_file=', info[0], ', wavelength=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
+
+        # Create command
+        output_stats_file = save_stats_folder + 'slopeStats_' + filename_format(info) + '.root'
+        slope_command = slope_command_base + args.list_file + ' ' + save_tothists_folder + ' ' + output_stats_file + ' ' + int(args.verbose) + ' ' + region_lims
+
+        # Create the job script to run all these macros in an array
+        new_job_address = makeJobSingleScript('slopes_', example_jobScript, save_tothists_folder, slope_command, info, args.verbose)
+        job_addresses.append(new_job_address)
+
+    ### RUN JOB SCRIPTS ###
+    print('Submitting jobs...')
+    for job_address in job_addresses:
+        command = 'qsub ' + job_address
+        if args.verbose:
+            print('Running command: ', command)
+        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+
+    return True
+
+def getFOMs(args, input_info):
+    '''Get FOM from single absorption factor'''
 
 
 ### MAIN ###
