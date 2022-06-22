@@ -11,7 +11,7 @@
 #include "AMELLIE_utils.hpp"
 
 
-std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool record_info = true);
+std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool record_info = true,  std::string outRoot_filename = "Regions.root");
 std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist);
 void DrawRegionLims(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist, double abs);
 std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file);
@@ -26,15 +26,16 @@ int main(int argc, char** argv){
     std::string output_file = argv[3];
     // record extra info?
     bool record_info = std::stoi(argv[4]);
+    std::string output_root_filename = argv[5];
     // Read in region limits
-    double direct_x_max = std::stod(argv[5]);
-    double direct_x_min = std::stod(argv[6]);
-    double direct_y_max = std::stod(argv[7]);
-    double direct_y_min = std::stod(argv[8]);
-    double reflected_x_max = std::stod(argv[9]);
-    double reflected_x_min = std::stod(argv[10]);
-    double reflected_y_max = std::stod(argv[11]);
-    double reflected_y_min = std::stod(argv[12]);
+    double direct_x_max = std::stod(argv[6]);
+    double direct_x_min = std::stod(argv[7]);
+    double direct_y_max = std::stod(argv[8]);
+    double direct_y_min = std::stod(argv[9]);
+    double reflected_x_max = std::stod(argv[10]);
+    double reflected_x_min = std::stod(argv[11]);
+    double reflected_y_max = std::stod(argv[12]);
+    double reflected_y_min = std::stod(argv[13]);
 
     // Set up regions
     rectangle direct_region = rectangle(direct_x_max, direct_x_min, direct_y_max, direct_y_min);
@@ -52,8 +53,8 @@ int main(int argc, char** argv){
     }
 
     // Get FOM/abs slope + FOM points
-    std::vector<std::vector<double> > results = GetFOMabsSlope(direct_region, reflected_region, traking_files, abs_scalings, abs1_idx, record_info);
-    double y = results.at(0).at(0);  // slope
+    std::vector<std::vector<double> > results = GetFOMabsSlope(direct_region, reflected_region, traking_files, abs_scalings, abs1_idx, record_info, output_root_filename);
+    double slope = results.at(0).at(0);
     std::vector<double> FOM = results.at(1);  // normalised FOM (reflected / direct)
     std::vector<double> FOM_err = results.at(2);  // normalised FOM stat errors
 
@@ -64,7 +65,7 @@ int main(int argc, char** argv){
     datafile << direct_x_max << " " << direct_x_min << " " << direct_y_max << " " << direct_y_min << " " << reflected_x_max
              << " " << reflected_x_min << " " << reflected_y_max << " " << reflected_y_min << std::endl;
     // then print slope (final results)
-    datafile << y << std::endl;
+    datafile << slope << std::endl;
     if (record_info) {
         // print normalised FOM for each absorption
         for (unsigned int i = 0; i < abs_scalings.size(); ++i) {
@@ -87,7 +88,7 @@ int main(int argc, char** argv){
  * @param points 
  * @return double 
  */
-std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool record_info) {
+std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool record_info, std::string outRoot_filename) {
 
     // Read in histograms
     std::vector<TH2F*> hists;
@@ -96,9 +97,7 @@ std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectan
     }
 
     // Set up output histogram
-    std::string output_rootFilename = "RegionLims_" + std::to_string(direct_region.X_max()) + "_" + std::to_string(direct_region.X_min())
-                                                + "_" + std::to_string(direct_region.Y_max()) + "_" + std::to_string(direct_region.Y_min()) + ".root";
-    TFile *output_file = new TFile(output_rootFilename.c_str(), "RECREATE");
+    TFile *output_file = new TFile(outRoot_filename.c_str(), "RECREATE");
     output_file->cd();
 
     // Get ratio of hits in both triangular regions, and associated error, then normalise all to the ratio
