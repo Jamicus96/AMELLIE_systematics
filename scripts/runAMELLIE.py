@@ -28,6 +28,8 @@ def argparser():
                         default=1000, help='Number of events to simulate for each setting, total')
     parser.add_argument('--nevts_persim', '-n', type=int, dest='nevts_persim',
                         default=500, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
+    parser.add_argument('--max_jobs', '-m', type=int, dest='max_jobs',
+                        default=70, help='Max number of jobs/tasks running at any one time.')
     parser.add_argument('--region_lims', '-r', type=list, dest='region_lims',
                         default=[-0.95, 0.85, -0.95, 20,  -4, 20],
                         help='List of region limits: [direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy]')
@@ -265,7 +267,7 @@ def runSims(args, input_info):
     ### RUN JOB SCRIPTS ###
     print('Submitting jobs...')
     for i in range(len(n_evts)):
-        command = 'qsub -t 1-' + str(n_evts[i]) + ' ' + job_addresses[i] 
+        command = 'qsub -t 1-' + str(n_evts[i]) + ' -tc ' + args.max_jobs + ' ' + job_addresses[i] 
         if args.verbose:
             print('Running command: ', command)
         subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
@@ -331,7 +333,7 @@ def getHists(args, input_info):
     ### RUN JOB SCRIPTS ###
     print('Submitting jobs...')
     for i in range(len(n_evts)):
-        command = 'qsub -t 1-' + str(n_evts[i]) + ' ' + job_addresses[i] 
+        command = 'qsub -t 1-' + str(n_evts[i]) + ' -tc ' + args.max_jobs + ' ' + job_addresses[i] 
         if args.verbose:
             print('Running command: ', command)
         subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
@@ -413,7 +415,7 @@ def getSlopes(args, input_info):
 
     ### RUN JOB SCRIPTS ###
     print('Submitting job...')
-    command = 'qsub ' + new_job_address
+    command = 'qsub -tc ' + args.max_jobs + ' ' + new_job_address
     if args.verbose:
         print('Running command: ', command)
     subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
