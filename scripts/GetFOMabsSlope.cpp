@@ -143,7 +143,7 @@ std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectan
     output_file->Close();
     if (!record_info) {
         // If root file wasn't used, delete it
-        int status = remove(output_rootFilename.c_str());
+        int status = remove(outRoot_filename.c_str());
     }
 
     // package results (main result is slope, but record other things too)
