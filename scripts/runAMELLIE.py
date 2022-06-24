@@ -114,9 +114,9 @@ def makeJobArrayScript(jobName_str, example_jobScript, overall_folder, commandLi
     new_job_address = checkRepo(new_job_address, verbose)
     new_job_address += job_str_map(jobName_str, info, True) + '.job'
 
-    output_logFile_address = overall_folder + 'log_files/log_'
+    output_logFile_address = overall_folder + 'log_files/'
     output_logFile_address = checkRepo(output_logFile_address, verbose)
-    output_logFile_address +=  jobName_str + filename_format(info) + '.txt'
+    output_logFile_address +=  'log_' + jobName_str + filename_format(info) + '.txt'
 
     new_jobScript = []
     for line in example_jobScript:
@@ -146,7 +146,7 @@ def makeJobSingleScript(jobName_str, example_jobScript, overall_folder, commands
 
     output_logFile_address = overall_folder + 'log_files/'
     output_logFile_address = checkRepo(output_logFile_address, verbose)
-    output_logFile_address +=  jobName_str + '.txt'
+    output_logFile_address +=  'log_' + jobName_str + '.txt'
 
     new_jobScript = []
     for line in example_jobScript:
