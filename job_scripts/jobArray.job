@@ -2,7 +2,7 @@
 #$ -cwd
 #$ -q smp.q@@EPP
 #$ -j y
-# -o output_log.txt
+#$ -o output_log.txt
 ##############################################
 
 # Run with: qsub -t 1-N jobArray.job

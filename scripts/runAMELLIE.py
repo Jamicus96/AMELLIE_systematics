@@ -5,6 +5,9 @@ import subprocess
 import json
 import time
 
+# ADD RAT LOG FILE NAME
+# CHECK LED WAVELENGTH FORMAT (macro vs just number)
+# OUTPUT FILE FOR FINAL JSON TABLE
 
 def argparser():
     '''Define arguments'''
@@ -23,6 +26,9 @@ def argparser():
                         default='/mnt/lustre/scratch/epp/jp643/AMELLIE/tot_hists/', help='Folder to save recombined root files with tracking information in.')
     parser.add_argument('--stats_repo', '-str', type=str, dest='stats_repo',
                         default='/mnt/lustre/scratch/epp/jp643/AMELLIE/stats/', help='Folder to save stats txt files in.')
+    parser.add_argument('--json_repo', '-str', type=str, dest='json_repo',
+                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/final_stats/',
+                        help='Folder to json file with final stats in.')
 
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
                         default=1000, help='Number of events to simulate for each setting, total')
@@ -74,12 +80,42 @@ def filename_format(info):
     # geo_file[:-4] + '_' + wavelength + '_' + fibre + 'reemis' + reemis + '_abs' + abs
     return 'AMELLIE_' + info[0][:-4] + '_' + info[1] + '_' + info[2] + 'reemis' + info[3] + '_abs' + info[4]
 
+def job_str_map(jobName_str, info, isArray):
+    '''Create code string to put at the start of the job file name, so that it can
+    be recognised in the job list (the job list only displays the first 10 characters).'''
+
+    map = {
+        'job_name': {
+            'sims_': 'M',
+            'hists_': 'H',
+            'slopes_': 'S'
+        },
+        'geo_file': {
+            'snoplusnative_te.geo': 'a'
+        },
+        'LED': {
+            'LED403': 'A'
+        },
+        'fibre': {
+            'FA108': 'a'
+        }
+    }
+
+    # 'geo_file=', info[0], ', wavelength=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4]
+    string = map['job_name'][jobName_str] + map['geo_file'][info[0]] + map['LED'][info[1]] + map['fibre'][info[2]] + info[3][:2]
+    # If need one more character, can remove geo file character I guess. Anyway, only 9 characters needed max so far.
+    # the '0.' from the reemission fraction is removed since it will always be between 0 and 1
+    if isArray:
+        string += info[4]  # 1.05 = 4 characters
+
+    return string
+
 def makeJobArrayScript(jobName_str, example_jobScript, overall_folder, commandList_address, info, verbose):
     '''Create job script to run array of rat macros'''
 
     new_job_address = overall_folder + 'jobs_scripts/'
     new_job_address = checkRepo(new_job_address, verbose)
-    new_job_address += jobName_str + '.job'
+    new_job_address += job_str_map(jobName_str, info, True) + '.job'
 
     output_logFile_address = overall_folder + 'log_files/'
     output_logFile_address = checkRepo(output_logFile_address, verbose)
@@ -109,7 +145,7 @@ def makeJobSingleScript(jobName_str, example_jobScript, overall_folder, commands
 
     new_job_address = overall_folder + 'jobs_scripts/'
     new_job_address = checkRepo(new_job_address, verbose)
-    new_job_address += jobName_str + '.job'
+    new_job_address += job_str_map(jobName_str, info, False) + '.job'
 
     output_logFile_address = overall_folder + 'log_files/'
     output_logFile_address = checkRepo(output_logFile_address, verbose)
@@ -144,23 +180,25 @@ def getNevtsPerMacro(nevts_total, nevts_persim):
 
     return n_evts
 
-def checkJobsDone(jobName_substr, input_info, wait_time):
+def checkJobsDone(jobName_substr, input_info, wait_time, isArray):
     '''Wait until submitted jobs of certain forma are finished. Wait time in seconds.'''
+
+    # Turns out the name of the job is only the 10 first characters of the job file name
 
     running = True
     while running:
         running = False
-        output = subprocess.Popen('qstat -u $USER', stdout=subprocess.PIPE).communicate()[0]
+        output = subprocess.Popen('qstat -u $USER', stdout=subprocess.PIPE, shell=True).communicate()[0]
         lines = output.decode("utf-8").split('\n')
         for line in lines:
             if running:
                 break
             else:
                 for info in input_info:
-                    if jobName_substr + filename_format(info) in line:
+                    if job_str_map(jobName_substr, info, isArray) in line:
                         running = True
                         break
-        time.wait(wait_time)
+        time.sleep(wait_time)
 
     return True
 
@@ -300,7 +338,7 @@ def getHists(args, input_info):
     n_evts = getNevtsPerMacro(args.nevts_total, args.nevts_persim)
 
     ### Check that all simulations have finished running ###
-    checkJobsDone('sims_jobScript_', filename_format(info), 10)
+    checkJobsDone('sims_jobScript_', filename_format(info), 10, True)
 
     ### MAKE JOB SCRIPTS TO CREATE HISTOGRAMS ###
     print('Creating macros and job scripts...')
@@ -339,7 +377,7 @@ def getHists(args, input_info):
         subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
 
     # Wait until these job arrays are done
-    checkJobsDone('hists_jobScript_', filename_format(input_info), 10)
+    checkJobsDone('hists_jobScript_', filename_format(input_info), 10, True)
 
     ### COMBINE SPLIT UP HISTS ###
     print('Combining hists...')
@@ -376,9 +414,6 @@ def getSlopes(args, input_info):
     # Folder for job scripts and command lists they use
     jobScript_repo = save_tothists_folder + 'job_scripts/'
     jobScript_repo = checkRepo(jobScript_repo, args.verbose)
-
-    ### Check that all simulations have finished running ###
-    # checkJobsDone('sims_jobScript_', filename_format(info), 10)
 
     # Package region limits in string format to use in commands
     # args.region_lims = [direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy]
@@ -421,7 +456,7 @@ def getSlopes(args, input_info):
     subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
 
     # Wait until these job arrays are done
-    checkJobsDone('slopes_', filename_format(input_info), 10)
+    checkJobsDone('slopes_', filename_format(input_info), 10, False)
 
     # Read in results to make json table for easier use
     with open(output_stats_file, "r") as f:
