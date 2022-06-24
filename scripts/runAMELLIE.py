@@ -286,9 +286,9 @@ def runSims(args, input_info):
         commandList_file = open(commandList_address, 'w')
         for i in range(n_evts):
             # Create all the macros
-            new_macro_address = makeMacros(example_macro, save_macro_folder, save_sims_folder, abs_nominal, info, n_evts[i], i)
-            #macro_addresses.append(new_macro_address)
-            macro_command = 'rat ' + new_macro_address #+ ' -s ' + random_seed
+            macro_address = makeMacros(example_macro, save_macro_folder, save_sims_folder, abs_nominal, info, n_evts[i], i)
+            log_file_address = 'ratLog_' + filename_format(info) + '.log'
+            macro_command = 'rat ' + macro_address + ' -l ' + log_file_address # + ' -s ' + random_seed
             commandList_file.write(macro_command + '\n')
         commandList_file.close()
 

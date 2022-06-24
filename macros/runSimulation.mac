@@ -8,7 +8,7 @@
 /rat/physics_list/OmitHadronicProcesses true
 
 #store tracking info
-/rat/tracking/store full
+#/rat/tracking/store full
 
 # To use simulated external asynch trigger
 /rat/db/set DAQ_RUN_LEVEL trigger_mask 32768
