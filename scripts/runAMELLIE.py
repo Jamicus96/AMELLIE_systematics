@@ -5,9 +5,6 @@ import subprocess
 import json
 import time
 
-# ADD RAT LOG FILE NAME
-# CHECK LED WAVELENGTH FORMAT (macro vs just number)
-# OUTPUT FILE FOR FINAL JSON TABLE
 
 def argparser():
     '''Define arguments'''
@@ -75,9 +72,9 @@ def checkRepo(repo_address, verbose=False):
 
     return new_address
 
-def filename_format(info):
+def filename_format(info, withoutAbs=False):
     '''returns string with simulation info to use in filenames'''
-    # geo_file[:-4] + '_' + wavelength + '_' + fibre + 'reemis' + reemis + '_abs' + abs
+    # geo_file[:-4] + '_' + LED + '_' + fibre + 'reemis' + reemis + '_abs' + abs
     return 'AMELLIE_' + info[0][:-4] + '_' + info[1] + '_' + info[2] + 'reemis' + info[3] + '_abs' + info[4]
 
 def job_str_map(jobName_str, info, isArray):
@@ -280,7 +277,7 @@ def runSims(args, input_info):
     #random_seed = '-1829418327'  # option to make sure all sims have the same random seed, to isolate changes
     for info in input_info:
         if args.verbose:
-            print('geo_file=', info[0], ', wavelength=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
+            print('geo_file=', info[0], ', LED=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
         # Make list of commands for job array to call
         commandList_address = jobScript_repo + 'sim_commandList_' + filename_format(info) + '_' + str(i) + '.root'
         commandList_file = open(commandList_address, 'w')
@@ -346,7 +343,7 @@ def getHists(args, input_info):
     job_addresses = []
     for info in input_info:
         if args.verbose:
-            print('geo_file=', info[0], ', wavelength=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
+            print('geo_file=', info[0], ', LED=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
         # Make list of commands for job array to call
         commandList_address = jobScript_repo + 'hist_commandList_' + filename_format(info) + '_' + str(i) + '.root'
         commandList_file = open(commandList_address, 'w')
@@ -439,7 +436,7 @@ def getSlopes(args, input_info):
     
 
     # Create command
-    info_str = input_info[0, 0] + '_' + input_info[0, 1] + '_' + input_info[0, 2] + '_' + input_info[0, 3]  # Same as usual but without absorption
+    info_str = filename_format(info[0, :], True)  # Same as usual but without absorption
     output_stats_file = save_stats_folder + 'slopeStats_' + info_str + '.txt'
     output_root_file = save_stats_folder + 'Regions_' + info_str + '.root'
     slope_command = slope_command_base + args.list_file + ' ' + save_tothists_folder + ' '\
@@ -484,7 +481,7 @@ def getSlopes(args, input_info):
             table[info[0]] = float(info[1])
 
     # Save table to json file
-    save_file = save_stats_folder + 'FinalStats_' + info_str + '.json'
+    save_file = args.json_repo + 'FinalStats_' + info_str + '.json'
     with open(save_file, 'w') as f:
         json.dump(table, f)
 
