@@ -26,7 +26,7 @@ def argparser():
                         default='/mnt/lustre/scratch/epp/jp643/AMELLIE/tot_hists/', help='Folder to save recombined root files with tracking information in.')
     parser.add_argument('--stats_repo', '-str', type=str, dest='stats_repo',
                         default='/mnt/lustre/scratch/epp/jp643/AMELLIE/stats/', help='Folder to save stats txt files in.')
-    parser.add_argument('--json_repo', '-str', type=str, dest='json_repo',
+    parser.add_argument('--json_repo', '-jsr', type=str, dest='json_repo',
                         default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/final_stats/',
                         help='Folder to json file with final stats in.')
 
