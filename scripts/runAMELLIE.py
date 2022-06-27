@@ -42,7 +42,7 @@ def argparser():
                         default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/info_lists/list.txt', help='Text file with list of sim stats. Format per line:\n\
                             geo_file.geo, LED, fibre, reemis, abs')
     parser.add_argument('---step', '-s', type=str, dest='step',
-                    default='all', choices=['sim', 'hist', 'sim-hist', 'FOM', 'slope', 'hist-FOM',
+                    default='allSlope', choices=['sim', 'hist', 'sim-hist', 'FOM', 'slope', 'hist-FOM',
                                             'hist-Slopes', 'allFOM', 'allSlope'],
                     help='which step of the process is it in?')
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
@@ -410,10 +410,27 @@ def getHists(args, input_info):
 
 ### Analysis functions ###
 
+def MakeSlopeCommand(input_info, line1, line2, repo_address, save_stats_folder, save_tothists_folder, args):
+    '''Create string of command to run slope code'''
+
+    # Create command
+    slope_command_base = repo_address + 'scripts/./GetFOMabsSlope.exe '
+    info_str = filename_format(input_info[line1, :], True)  # Same as usual but without absorption
+    output_stats_file = save_stats_folder + 'slopeStats_' + info_str + '.txt'
+    output_root_file = save_stats_folder + 'Regions_' + info_str + '.root'
+    slope_command = slope_command_base + args.list_file + ' ' + save_tothists_folder + ' '\
+                    + output_stats_file + ' ' + str(int(args.verbose)) + ' ' + output_root_file + ' ' + region_lims
+
+    # Create the job script to run all these macros in an array
+    new_job_address makeJobSingleScript('slopes_', example_jobScript, save_tothists_folder, slope_command, input_info[0], args.verbose)
+    return new_job_address, output_stats_file
+
+
 def getSlopes(args, input_info):
     '''Compute slope from FOM computed from different absorption scalings. If verbose flag is
     true, also records FOM for each different abs file. So, if only an FOM is wanted, just run this
     and ignore the slope result.'''
+    print('Running getSlopes().')
 
     # Read in example macro and job script + info
     repo_address = __file__[:-len('scripts/runAMMELIE.py')]
@@ -447,7 +464,7 @@ def getSlopes(args, input_info):
     checkJobsDone('tot_hists_', input_info, 10, False)
 
     ### MAKE JOB SCRIPTS TO RUN ANALYSIS ###
-    print('Creating macros and job scripts...')
+    print('Creating analysis job scripts...')
 
     # Check all input info that should be the same is in fact the same (everything except absorption for the moment)
     # geo_files = input_info[:, 0], wavelengths = input_info[:, 1], fibres = input_info[:, 2], reemissions = input_info[:, 3], abs_factors = input_info[:, 4]
@@ -455,56 +472,70 @@ def getSlopes(args, input_info):
 
     slope_command_base = repo_address + 'scripts/./GetFOMabsSlope.exe '
     
+    temp_info = input_info[0]
+    line1 = 0
+    i = 0
+    lines = []
+    job_addresses = []
+    output_stats_files = []
+    for info in input_info:
+        if args.verbose:
+            print('geo_file=', info[0], ', LED=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
 
-    # Create command
-    info_str = filename_format(input_info[0, :], True)  # Same as usual but without absorption
-    output_stats_file = save_stats_folder + 'slopeStats_' + info_str + '.txt'
-    output_root_file = save_stats_folder + 'Regions_' + info_str + '.root'
-    slope_command = slope_command_base + args.list_file + ' ' + save_tothists_folder + ' '\
-                    + output_stats_file + ' ' + str(int(args.verbose)) + ' ' + output_root_file + ' ' + region_lims
-
-    # Create the job script to run all these macros in an array
-    new_job_address = makeJobSingleScript('slopes_', example_jobScript, save_tothists_folder, slope_command, input_info[0], args.verbose)
+        line2 = i
+        # Check if all info except absorption is still the same
+        if info[line1, :4] != info[line2, :4]:
+            new_job_address, new_output_stats_file = MakeSlopeCommand(input_info, line1, line2, repo_address, save_stats_folder, save_tothists_folder, args)
+            job_addresses.append(new_job_address)
+            output_stats_files.append(new_output_stats_file)
+            lines.append(line1)
+            line1 = line2
+        i += 1
+    job_addresses.append(MakeSlopeCommand(input_info, line1, line2, repo_address, save_stats_folder, save_tothists_folder, args))
 
     ### RUN JOB SCRIPTS ###
-    print('Submitting job...')
-    command = 'qsub ' + new_job_address
-    if args.verbose:
-        print('Running command: ', command)
-    subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+    print('Submitting job(s)...')
+    for job_address in job_addresses:
+        command = 'qsub ' + new_job_address
+        if args.verbose:
+            print('Running command: ', command)
+        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
 
     # Wait until these job arrays are done
     checkJobsDone('slopes_', input_info, 10, False)
 
-    # Read in results to make json table for easier use
-    with open(output_stats_file, "r") as f:
-        stats = f.readlines()
-    table = {}
+    i = 0
+    for output_stats_file in output_stats_files:
+        # Read in results to make json table for easier use
+        with open(output_stats_file, "r") as f:
+            stats = f.readlines()
+        table = {}
 
-    # Get region limits
-    outer_lims = stats[0].split(' ')
-    # From: [direct_x_max, direct_x_min, direct_y_max, direct_y_min, reflected_x_max, reflected_x_min, reflected_y_max, reflected_y_min]
-    # To: [direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy]
-    table['region_lims'] = {}
-    table['region_lims']['direct_x_max'] = float(outer_lims[0])
-    table['region_lims']['reflected_x_min'] = float(outer_lims[5])
-    table['region_lims']['direct_y_centre'] = 0.5 * (float(outer_lims[2]) + float(outer_lims[3]))
-    table['region_lims']['direct_dy'] = float(outer_lims[2]) - float(outer_lims[3])
-    table['region_lims']['reflected_y_centre'] = 0.5 * (float(outer_lims[4]) + float(outer_lims[5]))
-    table['region_lims']['reflected_dy'] = float(outer_lims[4]) - float(outer_lims[5])
+        # Get region limits
+        outer_lims = stats[0].split(' ')
+        # From: [direct_x_max, direct_x_min, direct_y_max, direct_y_min, reflected_x_max, reflected_x_min, reflected_y_max, reflected_y_min]
+        # To: [direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy]
+        table['region_lims'] = {}
+        table['region_lims']['direct_x_max'] = float(outer_lims[0])
+        table['region_lims']['reflected_x_min'] = float(outer_lims[5])
+        table['region_lims']['direct_y_centre'] = 0.5 * (float(outer_lims[2]) + float(outer_lims[3]))
+        table['region_lims']['direct_dy'] = float(outer_lims[2]) - float(outer_lims[3])
+        table['region_lims']['reflected_y_centre'] = 0.5 * (float(outer_lims[4]) + float(outer_lims[5]))
+        table['region_lims']['reflected_dy'] = float(outer_lims[4]) - float(outer_lims[5])
 
-    # Get slope, and FOM of inividual absorptions if want extra info
-    table['slope'] = float(stats[1])
-    if args.verbose:
-        table['FOMs']
-        for i in range(2, len(stats)):
-            info = stats[i].split(' ')  # [abs, FOM]
-            table[info[0]] = float(info[1])
+        # Get slope, and FOM of inividual absorptions if want extra info
+        table['slope'] = float(stats[1])
+        if args.verbose:
+            table['FOMs']
+            for i in range(2, len(stats)):
+                info = stats[i].split(' ')  # [abs, FOM]
+                table[info[0]] = float(info[1])
 
-    # Save table to json file
-    save_file = args.json_repo + 'FinalStats_' + info_str + '.json'
-    with open(save_file, 'w') as f:
-        json.dump(table, f)
+        # Save table to json file
+        save_file = args.json_repo + 'FinalStats_' + filename_format(input_info[lines[i], :], True) + '.json'
+        with open(save_file, 'w') as f:
+            json.dump(table, f)
+        i += 1
 
     return True
 
