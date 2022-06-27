@@ -422,7 +422,7 @@ def MakeSlopeCommand(input_info, line1, line2, repo_address, save_stats_folder, 
                     + output_stats_file + ' ' + str(int(args.verbose)) + ' ' + output_root_file + ' ' + region_lims
 
     # Create the job script to run all these macros in an array
-    new_job_address makeJobSingleScript('slopes_', example_jobScript, save_tothists_folder, slope_command, input_info[0], args.verbose)
+    new_job_address = makeJobSingleScript('slopes_', example_jobScript, save_tothists_folder, slope_command, input_info[0], args.verbose)
     return new_job_address, output_stats_file
 
 
