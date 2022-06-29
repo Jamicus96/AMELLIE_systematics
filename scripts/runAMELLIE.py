@@ -54,6 +54,17 @@ def argparser():
 
 ### Miscelaneous functions ###
 
+def getRepoAddress():
+    '''Returns the full address of the git repo containing with script'''
+    repo_address = __file__[:-len('scripts/runAMMELIE.py')]
+    if repo_address == '':
+        firt_char = None
+    else:
+        firt_char = repo_address[0]
+    if firt_char != '/':
+        repo_address = os.getcwd() + '/' + repo_address
+    return repo_address
+
 def checkRepo(repo_address, verbose=False):
     '''Check format of repo address is right to be used here. Also if repo does not exist, create it.'''
 
@@ -152,7 +163,7 @@ def makeJobSingleScript(jobName_str, example_jobScript, overall_folder, commands
 
     output_logFile_address = overall_folder + 'log_files/'
     output_logFile_address = checkRepo(output_logFile_address, verbose)
-    output_logFile_address +=  'log_' + jobName_str + '.txt'
+    output_logFile_address +=  'log_' + jobName_str + filename_format(info) + '.txt'
 
     new_jobScript = []
     for line in example_jobScript:
@@ -257,7 +268,7 @@ def runSims(args, input_info):
     print('Running runSims().')
 
     # Read in example macro and job script + info
-    repo_address = __file__[:-len('scripts/runAMMELIE.py')]
+    repo_address = getRepoAddress()
 
     example_macro_address = repo_address + 'macros/runSimulation.mac'
     with open(example_macro_address, "r") as f:
@@ -322,7 +333,7 @@ def getHists(args, input_info):
     print('Running getHists().')
 
     # Read in example macro and job script + info
-    repo_address = __file__[:-len('scripts/runAMMELIE.py')]
+    repo_address = getRepoAddress()
 
     jobArrayScript_address = repo_address + 'job_scripts/jobArray.job'
     with open(jobArrayScript_address, "r") as f:
@@ -410,7 +421,7 @@ def getHists(args, input_info):
 
 ### Analysis functions ###
 
-def MakeSlopeCommand(input_info, line1, line2, repo_address, save_stats_folder, save_tothists_folder, args):
+def MakeSlopeCommand(input_info, line1, line2, region_lims, repo_address, example_jobScript, save_stats_folder, save_tothists_folder, args):
     '''Create string of command to run slope code'''
 
     # Create command
@@ -433,7 +444,7 @@ def getSlopes(args, input_info):
     print('Running getSlopes().')
 
     # Read in example macro and job script + info
-    repo_address = __file__[:-len('scripts/runAMMELIE.py')]
+    repo_address = getRepoAddress()
 
     jobScript_address = repo_address + 'job_scripts/jobSingle.job'
     with open(jobScript_address, "r") as f:
@@ -465,15 +476,9 @@ def getSlopes(args, input_info):
 
     ### MAKE JOB SCRIPTS TO RUN ANALYSIS ###
     print('Creating analysis job scripts...')
-
-    # Check all input info that should be the same is in fact the same (everything except absorption for the moment)
-    # geo_files = input_info[:, 0], wavelengths = input_info[:, 1], fibres = input_info[:, 2], reemissions = input_info[:, 3], abs_factors = input_info[:, 4]
-    result = np.all(input_info[:, 0] == input_info[0, 0]) and np.all(input_info[:, 1] == input_info[0, 1]) and np.all(input_info[:, 2] == input_info[0, 2]) and np.all(input_info[:, 3] == input_info[0, 3])
-
-    slope_command_base = repo_address + 'scripts/./GetFOMabsSlope.exe '
     
-    temp_info = input_info[0]
     line1 = 0
+    line2 = 0
     i = 0
     lines = []
     job_addresses = []
@@ -482,21 +487,25 @@ def getSlopes(args, input_info):
         if args.verbose:
             print('geo_file=', info[0], ', LED=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
 
-        line2 = i
         # Check if all info except absorption is still the same
-        if info[line1, :4] != info[line2, :4]:
-            new_job_address, new_output_stats_file = MakeSlopeCommand(input_info, line1, line2, repo_address, save_stats_folder, save_tothists_folder, args)
+        is_same = input_info[line1, 0] == info[0] and input_info[line1, 1] == info[1] and input_info[line1, 2] == info[2] and input_info[line1, 3] == info[3]
+        if not is_same:
+            new_job_address, new_output_stats_file = MakeSlopeCommand(input_info, line1, line2, region_lims, repo_address, example_jobScript, save_stats_folder, save_tothists_folder, args)
             job_addresses.append(new_job_address)
             output_stats_files.append(new_output_stats_file)
             lines.append(line1)
-            line1 = line2
+            line1 = line2 + 1
+        line2 = i
         i += 1
-    job_addresses.append(MakeSlopeCommand(input_info, line1, line2, repo_address, save_stats_folder, save_tothists_folder, args))
+    new_job_address, new_output_stats_file = MakeSlopeCommand(input_info, line1, line2, region_lims, repo_address, example_jobScript, save_stats_folder, save_tothists_folder, args)
+    job_addresses.append(new_job_address)
+    output_stats_files.append(new_output_stats_file)
+    lines.append(line1)
 
     ### RUN JOB SCRIPTS ###
     print('Submitting job(s)...')
     for job_address in job_addresses:
-        command = 'qsub ' + new_job_address
+        command = 'qsub ' + job_address
         if args.verbose:
             print('Running command: ', command)
         subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished

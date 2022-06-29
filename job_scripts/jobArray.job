@@ -9,7 +9,7 @@
 
 echo "Running AMELLIE job array job script"
 module load sge
-module load gcc/5.4.0
+#module load gcc/5.4.0
 # My rat source:
 #source /mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/rat_source.sh
 # RAT7 using ROOT5:

@@ -14,28 +14,30 @@
 std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool record_info = true,  std::string outRoot_filename = "Regions.root");
 std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist);
 void DrawRegionLims(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist, double abs);
-std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file);
+std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file, unsigned int first_line, unsigned int last_line);
 
 
 
-int main(int argc, char** argv){
+int main(int argc, char** argv) {
     // Read in text file with list of stats that were simulated (different abs, the rest the same for now)
     std::string info_file = argv[1];
-    std::string tracking_hist_repo = argv[2];
+    unsigned int first_line = std::stoi(argv[2]);
+    unsigned int last_line = std::stoi(argv[3]);
+    std::string tracking_hist_repo = argv[4];
     // Read in output filename (txt)
-    std::string output_file = argv[3];
+    std::string output_file = argv[5];
     // record extra info?
-    bool record_info = std::stoi(argv[4]);
-    std::string output_root_filename = argv[5];
+    bool record_info = std::stoi(argv[6]);
+    std::string output_root_filename = argv[7];
     // Read in region limits
-    double direct_x_max = std::stod(argv[6]);
-    double direct_x_min = std::stod(argv[7]);
-    double direct_y_max = std::stod(argv[8]);
-    double direct_y_min = std::stod(argv[9]);
-    double reflected_x_max = std::stod(argv[10]);
-    double reflected_x_min = std::stod(argv[11]);
-    double reflected_y_max = std::stod(argv[12]);
-    double reflected_y_min = std::stod(argv[13]);
+    double direct_x_max = std::stod(argv[8]);
+    double direct_x_min = std::stod(argv[9]);
+    double direct_y_max = std::stod(argv[10]);
+    double direct_y_min = std::stod(argv[11]);
+    double reflected_x_max = std::stod(argv[12]);
+    double reflected_x_min = std::stod(argv[13]);
+    double reflected_y_max = std::stod(argv[14]);
+    double reflected_y_min = std::stod(argv[15]);
 
     // Set up regions
     rectangle direct_region = rectangle(direct_x_max, direct_x_min, direct_y_max, direct_y_min);
@@ -43,7 +45,7 @@ int main(int argc, char** argv){
 
     //Create list of tracking hist file name from info file, and list abs_scalings
 
-    std::vector<std::vector<std::string> > file_info = readInfoFile(tracking_hist_repo, info_file);
+    std::vector<std::vector<std::string> > file_info = readInfoFile(tracking_hist_repo, info_file, first_line, last_line);
 
     std::vector<std::string> traking_files = file_info.at(0);
     unsigned int abs1_idx = std::stoi(file_info.at(2).at(0));
@@ -241,10 +243,13 @@ void DrawRegionLims(rectangle direct_region, rectangle reflected_region, TH2F *a
 /**
  * @brief Reads information from text file with simulation info into.
  * 
- * @param info_file 
+ * @param tracking_hist_repo folder containing root file with histograms to analyse
+ * @param info_file File with analysis info this will read
+ * @param first_line First line to read info from
+ * @param last_line Last line to read info from
  * @return std::vector<std::string> {traking_files, abs_scalings, abs1_idx}
  */
-std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file) {
+std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file, unsigned int first_line, unsigned int last_line) {
 
     std::ifstream file(info_file);
     std::string str;
@@ -264,6 +269,8 @@ std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_re
     while (std::getline(file, str)) {
         // format in info file: geo_file.geo, LEDnum, fibre, reemis, abs
         // format in tracking hist file name: tot_AMELLIE_geoFile_LEDnum_fibre_reemis_abs.root
+
+        if (i < first_line || i > last_line) {continue;} // only read between selected lines
         
         pos = str.find(delimiter);
         substr = str.substr(0, pos);
