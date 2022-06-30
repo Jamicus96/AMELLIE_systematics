@@ -100,7 +100,7 @@ def job_str_map(jobName_str, info, isArray):
     map = {
         'job_name': {
             'sims_': 'M',
-            'hists_': 'H',
+            'splitHist_': 'H',
             'tot_hists_': 'T',
             'slopes_': 'S'
         },
@@ -360,7 +360,7 @@ def getHists(args, input_info):
 
     ### MAKE JOB SCRIPTS TO CREATE HISTOGRAMS ###
     print('Creating split hist job scripts...')
-    hist_command_base = repo_address + 'scripts/./GetHists.exe '
+    hist_command_base = repo_address + 'scripts/GetHists.exe '
     job_addresses = []
     for info in input_info:
         if args.verbose:
@@ -378,7 +378,7 @@ def getHists(args, input_info):
         commandList_file.close()
 
         # Create the job script to run all these macros in an array
-        new_job_address = makeJobArrayScript('hists_', example_jobArrayScript, save_sims_folder, commandList_address, info, args.verbose)
+        new_job_address = makeJobArrayScript('splitHist_', example_jobArrayScript, save_sims_folder, commandList_address, info, args.verbose)
         job_addresses.append(new_job_address)
 
     ### RUN JOB SCRIPTS ###
@@ -390,7 +390,7 @@ def getHists(args, input_info):
         subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
 
     # Wait until these job arrays are done
-    checkJobsDone('hists_', input_info, 10, True)
+    checkJobsDone('splitHist_', input_info, 10, True)
 
     ### ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ###
 
@@ -402,7 +402,7 @@ def getHists(args, input_info):
         if args.verbose:
             print('geo_file=', info[0], ', LED=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
         # Make list of command for job to call
-        command = hist_command_base + filename_format(info) + '.root ' + save_splithists_folder + 'hists_' + filename_format(info) + '_*.root'
+        command = hist_command_base + filename_format(info) + '.root ' + save_splithists_folder + 'splitHist_' + filename_format(info) + '_*.root'
 
         # Create the job script to run all these macros in an array
         new_job_address = makeJobSingleScript('tot_hists_', example_jobSingleScript, save_splithists_folder, command, info, args.verbose)
@@ -425,17 +425,16 @@ def MakeSlopeCommand(input_info, line1, line2, region_lims, repo_address, exampl
     '''Create string of command to run slope code'''
 
     # Create command
-    slope_command_base = repo_address + 'scripts/./GetFOMabsSlope.exe '
+    slope_command_base = repo_address + 'scripts/GetFOMabsSlope.exe '
     info_str = filename_format(input_info[line1, :], True)  # Same as usual but without absorption
     output_stats_file = save_stats_folder + 'slopeStats_' + info_str + '.txt'
     output_root_file = save_stats_folder + 'Regions_' + info_str + '.root'
-    slope_command = slope_command_base + args.list_file + ' ' + save_tothists_folder + ' '\
+    slope_command = slope_command_base + args.list_file + ' ' + str(line1) + ' ' + str(line2) + ' ' + save_tothists_folder + ' '\
                     + output_stats_file + ' ' + str(int(args.verbose)) + ' ' + output_root_file + ' ' + region_lims
 
     # Create the job script to run all these macros in an array
     new_job_address = makeJobSingleScript('slopes_', example_jobScript, save_tothists_folder, slope_command, input_info[0], args.verbose)
     return new_job_address, output_stats_file
-
 
 def getSlopes(args, input_info):
     '''Compute slope from FOM computed from different absorption scalings. If verbose flag is
@@ -453,6 +452,7 @@ def getSlopes(args, input_info):
     # Make sure folders are of the correct format to  use later
     save_tothists_folder = checkRepo(args.tothist_repo, args.verbose)
     save_stats_folder = checkRepo(args.stats_repo, args.verbose)
+    json_stats_folder = checkRepo(args.json_repo, args.verbose)
 
     # Folder for job scripts and command lists they use
     jobScript_repo = save_tothists_folder + 'job_scripts/'
@@ -535,13 +535,13 @@ def getSlopes(args, input_info):
         # Get slope, and FOM of inividual absorptions if want extra info
         table['slope'] = float(stats[1])
         if args.verbose:
-            table['FOMs']
-            for i in range(2, len(stats)):
-                info = stats[i].split(' ')  # [abs, FOM]
-                table[info[0]] = float(info[1])
+            table['FOMs'] = {}
+            for j in range(2, len(stats)):
+                info = stats[j].split(' ')  # [abs, FOM]
+                table['FOMs'][info[0]] = float(info[1])
 
         # Save table to json file
-        save_file = args.json_repo + 'FinalStats_' + filename_format(input_info[lines[i], :], True) + '.json'
+        save_file = json_stats_folder + 'FinalStats_' + filename_format(input_info[lines[i], :], True) + '.json'
         with open(save_file, 'w') as f:
             json.dump(table, f)
         i += 1

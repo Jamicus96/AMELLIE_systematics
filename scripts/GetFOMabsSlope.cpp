@@ -6,15 +6,16 @@
 #include <TLine.h>
 #include <iostream>
 #include <fstream>
+#include <string>
 #include <chrono>
 #include <vector>
 #include "AMELLIE_utils.hpp"
 
 
-std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool record_info = true,  std::string outRoot_filename = "Regions.root");
-std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist);
+std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool verbose,  std::string outRoot_filename = "Regions.root");
+std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist, bool verbose);
 void DrawRegionLims(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist, double abs);
-std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file, unsigned int first_line, unsigned int last_line);
+std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file, unsigned int first_line, unsigned int last_line, bool verbose);
 
 
 
@@ -27,7 +28,7 @@ int main(int argc, char** argv) {
     // Read in output filename (txt)
     std::string output_file = argv[5];
     // record extra info?
-    bool record_info = std::stoi(argv[6]);
+    bool verbose = std::stoi(argv[6]);
     std::string output_root_filename = argv[7];
     // Read in region limits
     double direct_x_max = std::stod(argv[8]);
@@ -45,17 +46,17 @@ int main(int argc, char** argv) {
 
     //Create list of tracking hist file name from info file, and list abs_scalings
 
-    std::vector<std::vector<std::string> > file_info = readInfoFile(tracking_hist_repo, info_file, first_line, last_line);
+    std::vector<std::vector<std::string> > file_info = readInfoFile(tracking_hist_repo, info_file, first_line, last_line, verbose);
 
     std::vector<std::string> traking_files = file_info.at(0);
     unsigned int abs1_idx = std::stoi(file_info.at(2).at(0));
     std::vector<double> abs_scalings;
-    for (unsigned int i = 0; i < file_info.size(); ++i) {
+    for (unsigned int i = 0; i < traking_files.size(); ++i) {
         abs_scalings.push_back(std::stod(file_info.at(1).at(i)));
     }
 
     // Get FOM/abs slope + FOM points
-    std::vector<std::vector<double> > results = GetFOMabsSlope(direct_region, reflected_region, traking_files, abs_scalings, abs1_idx, record_info, output_root_filename);
+    std::vector<std::vector<double> > results = GetFOMabsSlope(direct_region, reflected_region, traking_files, abs_scalings, abs1_idx, verbose, output_root_filename);
     double slope = results.at(0).at(0);
     std::vector<double> FOM = results.at(1);  // normalised FOM (reflected / direct)
     std::vector<double> FOM_err = results.at(2);  // normalised FOM stat errors
@@ -68,7 +69,7 @@ int main(int argc, char** argv) {
              << " " << reflected_x_min << " " << reflected_y_max << " " << reflected_y_min << std::endl;
     // then print slope (final results)
     datafile << slope << std::endl;
-    if (record_info) {
+    if (verbose) {
         // print normalised FOM for each absorption
         for (unsigned int i = 0; i < abs_scalings.size(); ++i) {
             datafile << abs_scalings.at(i) << " " << FOM.at(i) << " " << FOM_err.at(i) << std::endl;
@@ -90,7 +91,7 @@ int main(int argc, char** argv) {
  * @param points 
  * @return double 
  */
-std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool record_info, std::string outRoot_filename) {
+std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool verbose, std::string outRoot_filename) {
 
     // Read in histograms
     std::vector<TH2F*> hists;
@@ -106,7 +107,7 @@ std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectan
     // found at abs = 1. Then compute best fit slope of normalised ratio vs abs:
 
     // abs = 1 ratio
-    std::vector<double> ratio_abs1 = getRatio(direct_region, reflected_region, hists.at(abs1_idx));
+    std::vector<double> ratio_abs1 = getRatio(direct_region, reflected_region, hists.at(abs1_idx), verbose);
 
     double ratio;
     double ratio_err;
@@ -117,7 +118,7 @@ std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectan
     std::vector<double> ratio_errs;
     for (unsigned int n = 0; n < abs_scalings.size(); ++n) {
         // ratio for other abs
-        ratio_res = getRatio(direct_region, reflected_region, hists.at(n));
+        ratio_res = getRatio(direct_region, reflected_region, hists.at(n), verbose);
         if (ratio_res.at(0) == -1.0) {
             std::cout << "ERROR: Region with no hits :/" << std::endl;
             exit(1);
@@ -131,7 +132,7 @@ std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectan
         S_xy += ((abs_scalings.at(n) - 1.0) * (ratio - 1.0)) / (ratio_err*ratio_err);
         S_xx += ((abs_scalings.at(n) - 1.0) * (abs_scalings.at(n) - 1.0)) / (ratio_err*ratio_err);
 
-        if (record_info) {
+        if (verbose) {
             // Create histogram to show regions on 2D t_res vs cos(theta) histogram
             DrawRegionLims(direct_region, reflected_region, hists.at(n), abs_scalings.at(n));
             // Add of vectors
@@ -143,7 +144,7 @@ std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectan
     // write to output file and close
     output_file->Write();
     output_file->Close();
-    if (!record_info) {
+    if (!verbose) {
         // If root file wasn't used, delete it
         int status = remove(outRoot_filename.c_str());
     }
@@ -164,20 +165,23 @@ std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectan
  * @param allPathsHist 
  * @return std::vector<double> 
  */
-std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist) {
+std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist, bool verbose) {
 
     // Count number of hits in direct and reflected regions
     double direct_count = 0.0;
     double reflected_count = 0.0;
-    for(int x=1; x<allPathsHist->GetNbinsX()+1; x++){ //loop over histogram bins
+    int NbinsX = allPathsHist->GetNbinsX();
+    int NbinsY = allPathsHist->GetNbinsY();
+    if (verbose) {std::cout << "NbinsX = " << NbinsX << ", NbinsY = " << NbinsY << std::endl;}
+    for (int x = 1; x < NbinsX + 1; x++) {  // loop over histogram bins
         double xBinCenter = allPathsHist->GetXaxis()->GetBinCenter(x);
-        for(int y=1; y<allPathsHist->GetNbinsY()+1; y++){
+        for (int y = 1; y < NbinsY + 1; y++) {
             double yBinCenter = allPathsHist->GetYaxis()->GetBinCenter(y);
-            if(direct_region.check_point_inside_rectangle(xBinCenter, yBinCenter)){
+            if (direct_region.check_point_inside_rectangle(xBinCenter, yBinCenter)) {
                 direct_count += allPathsHist->GetBinContent(x,y);
                 // std::cout << "+d" << std::endl;
             }
-            if(reflected_region.check_point_inside_rectangle(xBinCenter, yBinCenter)){
+            if (reflected_region.check_point_inside_rectangle(xBinCenter, yBinCenter)) {
                 reflected_count += allPathsHist->GetBinContent(x,y);
                 // std::cout << "+r" << std::endl;
             }
@@ -249,7 +253,7 @@ void DrawRegionLims(rectangle direct_region, rectangle reflected_region, TH2F *a
  * @param last_line Last line to read info from
  * @return std::vector<std::string> {traking_files, abs_scalings, abs1_idx}
  */
-std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file, unsigned int first_line, unsigned int last_line) {
+std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file, unsigned int first_line, unsigned int last_line, bool verbose) {
 
     std::ifstream file(info_file);
     std::string str;
@@ -263,7 +267,7 @@ std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_re
 
     int i = 0;
     std::string delimiter = ", ";
-    std::size_t pos;
+    std::size_t pos; std::size_t pos_1; std::size_t pos_2;
     std::string substr;
     std::string full_geo;
     while (std::getline(file, str)) {
@@ -272,12 +276,12 @@ std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_re
 
         if (i < first_line || i > last_line) {continue;} // only read between selected lines
         
-        pos = str.find(delimiter);
+        pos_1 = str.find(delimiter);
         substr = str.substr(0, pos);
         full_geo = str.substr(0, pos);
-        pos = full_geo.find(".geo");
-        geo_file = full_geo.substr(0, pos);
-        str = str.substr(pos + delimiter.size());
+        pos_2 = full_geo.find(".geo");
+        geo_file = full_geo.substr(0, pos_2);
+        str = str.substr(pos_1 + delimiter.size());
 
         pos = str.find(delimiter);
         substr = str.substr(0, pos);
@@ -295,9 +299,12 @@ std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_re
         str = str.substr(pos + delimiter.size());
 
         abs_scalings.push_back(str);
-        traking_files.push_back(tracking_hist_repo + "tot_AMELLIE_" + geo_file + "_" + wavelength + "_" + fibre + "_reemis" + reemission + "_abs" + str + ".root");
+        traking_files.push_back(tracking_hist_repo + "tot_hists_AMELLIE_" + geo_file + "_" + wavelength + "_" + fibre + "_reemis" + reemission + "_abs" + str + ".root");
 
         if (std::stof(str) == 1.0) {abs1_idx.at(0) = std::to_string(i);}  // found absorption=1 case
+        if (verbose) {
+            std::cout << "abs = " << abs_scalings.at(i) << ", tracking file = " << traking_files.at(i) << ", abs1_idx = " << abs1_idx.at(0) << std::endl;
+        }
         ++i;
     }
 
