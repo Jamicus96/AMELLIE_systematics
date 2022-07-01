@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
 
     // Print it to file, after region info
     std::ofstream datafile;
-    datafile.open(output_file.c_str(), std::ios::app);
+    datafile.open(output_file.c_str(), std::ios::trunc);
     // print region limits first
     datafile << direct_x_max << " " << direct_x_min << " " << direct_y_max << " " << direct_y_min << " " << reflected_x_max
              << " " << reflected_x_min << " " << reflected_y_max << " " << reflected_y_min << std::endl;
