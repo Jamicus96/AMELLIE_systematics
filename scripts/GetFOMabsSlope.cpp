@@ -258,6 +258,7 @@ std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_re
     std::ifstream file(info_file);
     std::string str;
     std::string geo_file;  // sans the ".geo" part
+    std::string inner_av_material;
     std::string wavelength;  // nm
     std::string fibre;
     std::string reemission;  // reemission fraction of absorbed light
@@ -285,6 +286,11 @@ std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_re
 
         pos = str.find(delimiter);
         substr = str.substr(0, pos);
+        inner_av_material = str.substr(0, pos);
+        str = str.substr(pos + delimiter.size());
+
+        pos = str.find(delimiter);
+        substr = str.substr(0, pos);
         wavelength = str.substr(0, pos);
         str = str.substr(pos + delimiter.size());
 
@@ -299,7 +305,7 @@ std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_re
         str = str.substr(pos + delimiter.size());
 
         abs_scalings.push_back(str);
-        traking_files.push_back(tracking_hist_repo + "tot_hists_AMELLIE_" + geo_file + "_" + wavelength + "_" + fibre + "_reemis" + reemission + "_abs" + str + ".root");
+        traking_files.push_back(tracking_hist_repo + "tot_hists_AMELLIE_" + geo_file + "_" + inner_av_material + "_" + wavelength + "_" + fibre + "_reemis" + reemission + "_abs" + str + ".root");
 
         if (std::stof(str) == 1.0) {abs1_idx.at(0) = std::to_string(i);}  // found absorption=1 case
         if (verbose) {

@@ -45,8 +45,8 @@ def argparser():
                         default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/region_lims/lim_list.txt', help='Text file with list of region limits to apply. Format per line:\n\
                             direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy')
     parser.add_argument('---step', '-s', type=str, dest='step',
-                    default='allSlope', choices=['sim', 'hist', 'sim-hist', 'FOM', 'slope', 'hist-FOM',
-                                            'hist-Slopes', 'allFOM', 'allSlope'],
+                    default='all', choices=['sim', 'hist', 'sim-hist', 'FOM', 'slope', 'hist-FOM',
+                                            'hist-Slopes', 'all'],
                     help='which step of the process is it in?')
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                     default=True, help='print and save extra info')
@@ -89,8 +89,8 @@ def checkRepo(repo_address, verbose=False):
 
 def filename_format(info, Analysis=False, outer_lims=None):
     '''returns string with simulation info to use in filenames'''
-    # geo_file[:-4] + '_' + LED + '_' + fibre + 'reemis' + reemis + '_abs' + abs
-    name = 'AMELLIE_' + info[0][:-4] + '_' + info[1] + '_' + info[2] + '_reemis' + info[3]
+    # geo_file[:-4] + '_' + inner_av_material + '_' + LED + '_' + fibre + 'reemis' + reemis + '_abs' + abs
+    name = 'AMELLIE_' + info[0][:-4] + '_' + info[1] + '_' + info[2] + '_' + info[3] + '_reemis' + info[4]
     if Analysis:
         if outer_lims is not None:
             return name + '_' + str(outer_lims[0]) + '_' + str(outer_lims[1]) + '_' + str(outer_lims[2]) + '_' + str(outer_lims[3]) + '_'\
@@ -98,7 +98,7 @@ def filename_format(info, Analysis=False, outer_lims=None):
         else:
             return name
     else:
-        return name + '_abs' + info[4]
+        return name + '_abs' + info[5]
 
 def job_str_map(jobName_str, info, isArray):
     '''Create code string to put at the start of the job file name, so that it can
@@ -112,18 +112,24 @@ def job_str_map(jobName_str, info, isArray):
             'slopes_': 'S'
         },
         'geo_file': {
-            'snoplusnative_te.geo': 'a'
+            'snoplusnative.geo': 'a',
+            'snoplusnative_te.geo': 'b'
+        },
+        'inner_av_material': {
+            '': 'A',
+            'labppo_1p1_berkeley_scintillator': 'B'
         },
         'LED': {
-            'LED403': 'A'
+            'LED403': 'a'
         },
         'fibre': {
-            'FA108': 'a'
+            'FA108': 'A',
+            'FA093': 'B'
         }
     }
 
     # 'geo_file=', info[0], ', wavelength=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4]
-    string = map['job_name'][jobName_str] + map['geo_file'][info[0]] + map['LED'][info[1]] + map['fibre'][info[2]] + info[3][2:]
+    string = map['job_name'][jobName_str] + map['geo_file'][info[0]] + map['inner_av_material'][info[1]] + map['LED'][info[2]] + map['fibre'][info[3]] + info[4][2:]
     # If need one more character, can remove geo file character I guess. Anyway, only 9 characters needed max so far.
     # the '0.' from the reemission fraction is removed since it will always be between 0 and 1
     if isArray:
@@ -219,6 +225,9 @@ def checkJobsDone(jobName_substr, input_info, wait_time, isArray):
                 break
             else:
                 for info in input_info:
+                    map_str = job_str_map(jobName_substr, info, isArray)
+                    if len(map_str) > 10:
+                        map_str = map_str[:9]
                     if job_str_map(jobName_substr, info, isArray) in line:
                         running = True
                         break
@@ -233,7 +242,7 @@ def makeMacros(example_macro, save_macro_folder, save_sims_folder, abs_nominal, 
     '''Make and save macro according to provided parameters'''
 
     # Modify by factor abs_scaling_fact
-    abs_scaling_fact = float(info[4])
+    abs_scaling_fact = float(info[5])
     abs_scaling = '[' + str(abs_nominal[0] * abs_scaling_fact)
     abs_scaling += ', ' + str(abs_nominal[1] * abs_scaling_fact)
     abs_scaling += ', ' + str(abs_nominal[2] * abs_scaling_fact)
@@ -248,10 +257,15 @@ def makeMacros(example_macro, save_macro_folder, save_sims_folder, abs_nominal, 
         # Replace placeholders in macro
         if 'geo/YOUR_FAV_GEO_FILE.geo' in line:
             new_line = line.replace('YOUR_FAV_GEO_FILE.geo', info[0], 1)
+        elif 'YOUR_INNER_AV_MATERIAL' in line:
+            if info[1] == '':
+                new_line = ''
+            else:
+                new_line = line.replace('YOUR_INNER_AV_MATERIAL', info[1], 1)
         elif 'YOUR_FAV_LED' in line:
-            new_line = line.replace('YOUR_FAV_LED', info[1], 1)
+            new_line = line.replace('YOUR_FAV_LED', info[2], 1)
         elif 'YOUR_FAV_FIBRE' in line:
-            new_line = line.replace('YOUR_FAV_FIBRE', info[2], 1)
+            new_line = line.replace('YOUR_FAV_FIBRE', info[3], 1)
         elif '/PATH/TO/YOUR/OUTPUT/FILE.root' in line:
             new_line = line.replace('/PATH/TO/YOUR/OUTPUT/FILE.root', output_address, 1)
         elif '/rat/run/start 2000' in line:
@@ -305,7 +319,7 @@ def runSims(args, input_info):
     #random_seed = '-1829418327'  # option to make sure all sims have the same random seed, to isolate changes
     for info in input_info:
         if args.verbose:
-            print('geo_file=', info[0], ', LED=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
+            print('geo_file=', info[0], ', inner_av_material=', info[1], ', LED=', info[2], ', fibre=', info[3], ', reemis=', info[4], ', abs=', info[5])
         # Make list of commands for job array to call
         commandList_address = jobScript_repo + 'sim_commandList_' + filename_format(info) + '.txt'
         commandList_file = open(commandList_address, 'w')
@@ -371,16 +385,16 @@ def getHists(args, input_info):
     job_addresses = []
     for info in input_info:
         if args.verbose:
-            print('geo_file=', info[0], ', LED=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
+            print('geo_file=', info[0], ', inner_av_material=', info[1], ', LED=', info[2], ', fibre=', info[3], ', reemis=', info[4], ', abs=', info[5])
         # Make list of commands for job array to call
         commandList_address = jobScript_repo + 'hist_commandList_' + filename_format(info) + '.txt'
         commandList_file = open(commandList_address, 'w')
-        wavelength = info[1][3:]
+        wavelength = info[2][3:]
         for i in range(len(n_evts)):
             # Create all the histogram making commands
             hist_command = hist_command_base + save_sims_folder + 'simOut_' + filename_format(info) + '_' + str(i) + '.root '\
                                              + save_splithists_folder + 'splitHist_' + filename_format(info) + '_' + str(i) + '.root '\
-                                             + info[2] + ' ' + wavelength + ' ' + str(int(args.verbose))
+                                             + info[3] + ' ' + wavelength + ' ' + str(int(args.verbose))
             commandList_file.write(hist_command + '\n')
         commandList_file.close()
 
@@ -407,7 +421,7 @@ def getHists(args, input_info):
     job_addresses = []
     for info in input_info:
         if args.verbose:
-            print('geo_file=', info[0], ', LED=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
+            print('geo_file=', info[0], ', inner_av_material=', info[1], ', LED=', info[2], ', fibre=', info[3], ', reemis=', info[4], ', abs=', info[5])
         # Make list of command for job to call
         command = hist_command_base + filename_format(info) + '.root ' + save_splithists_folder + 'splitHist_' + filename_format(info) + '_*.root'
 
@@ -507,10 +521,10 @@ def getSlopes(args, input_info):
     i = 0
     for info in input_info:
         if args.verbose:
-            print('geo_file=', info[0], ', LED=', info[1], ', fibre=', info[2], ', reemis=', info[3], ', abs=', info[4])
+            print('geo_file=', info[0], ', inner_av_material=', info[1], ', LED=', info[2], ', fibre=', info[3], ', reemis=', info[4], ', abs=', info[5])
 
         # Check if all info except absorption is still the same
-        is_same = input_info[line1, 0] == info[0] and input_info[line1, 1] == info[1] and input_info[line1, 2] == info[2] and input_info[line1, 3] == info[3]
+        is_same = input_info[line1, 0] == info[0] and input_info[line1, 1] == info[1] and input_info[line1, 2] == info[2] and input_info[line1, 3] == info[3] and input_info[line1, 4] == info[4]
         if not is_same or i == len(input_info) - 1:
             # For each set of absorptions, apply all the region limits
             commandList_address = jobScript_repo + 'slopes_commandList_' + filename_format(input_info[line1], True) + '.txt'
@@ -557,9 +571,10 @@ def getSlopes(args, input_info):
         # Write sim info
         table = {}
         table['geo_file'] = input_info[line1, 0]
-        table['LED'] = input_info[line1, 1]
-        table['fibre'] = input_info[line1, 2]
-        table['reemis'] = input_info[line1, 3]
+        table['inner_av_material'] = input_info[line1, 1]
+        table['LED'] = input_info[line1, 2]
+        table['fibre'] = input_info[line1, 3]
+        table['reemis'] = input_info[line1, 4]
 
         # Write results for each region applied
         table['stats'] = []
@@ -638,10 +653,11 @@ def main():
     input_info = np.asarray(lines)
 
     # geo_files = input_info[:, 0]
-    # wavelengths = input_info[:, 1]
-    # fibres = input_info[:, 2]
-    # reemissions = input_info[:, 3]
-    # abs_factors = input_info[:, 4]
+    # inner_av_material = input_info[:, 1]
+    # wavelengths = input_info[:, 2]
+    # fibres = input_info[:, 3]
+    # reemissions = input_info[:, 4]
+    # abs_factors = input_info[:, 5]
 
     work_modes = {
         'sim': runSims,
@@ -649,7 +665,7 @@ def main():
         'sim-hist': runSims_getHists,
         'slope': getSlopes,
         'hist-Slopes': getHists_Slopes,
-        'allSlope': runAllSlopes
+        'all': runAllSlopes
     }
 
     result = work_modes[args.step](args, input_info)

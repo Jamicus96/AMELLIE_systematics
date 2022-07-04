@@ -15,6 +15,7 @@
 /rat/db/set DAQ_RUN_LEVEL trigger_enable 35967
 
 /rat/db/set DETECTOR geo_file "geo/YOUR_FAV_GEO_FILE.geo"
+/rat/db/set GEO[inner_av] material "YOUR_INNER_AV_MATERIAL"
 
 # Set the number of photons per beam
 /rat/db/set ELLIE intensity 1250
