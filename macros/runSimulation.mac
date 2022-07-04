@@ -27,6 +27,9 @@
 # Choose the TELLIE to fire
 /rat/db/set ELLIE source "YOUR_FAV_LED"
 
+# Set to AMELLIE distribution if using TELLIE LED (which 503nm is)
+#/rat/db/set ELLIE time_dist "AMELLIE3p0nsgauss" 
+
 # If using separate vertex and position generators, set the fibres below
 /rat/db/set ELLIE fibre_id "YOUR_FAV_FIBRE"
 
