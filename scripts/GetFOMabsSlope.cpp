@@ -268,7 +268,7 @@ std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_re
 
     int i = 0;
     std::string delimiter = ", ";
-    std::size_t pos; std::size_t pos_1; std::size_t pos_2;
+    std::size_t pos; std::size_t pos_1;
     std::string substr;
     std::string full_geo;
     while (std::getline(file, str)) {
@@ -277,12 +277,11 @@ std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_re
 
         if (i < first_line || i > last_line) {continue;} // only read between selected lines
         
-        pos_1 = str.find(delimiter);
-        substr = str.substr(0, pos);
+        pos = str.find(delimiter);
         full_geo = str.substr(0, pos);
-        pos_2 = full_geo.find(".geo");
-        geo_file = full_geo.substr(0, pos_2);
-        str = str.substr(pos_1 + delimiter.size());
+        pos_1 = full_geo.find(".geo");
+        geo_file = full_geo.substr(0, pos_1);
+        str = str.substr(pos + delimiter.size());
 
         pos = str.find(delimiter);
         substr = str.substr(0, pos);
