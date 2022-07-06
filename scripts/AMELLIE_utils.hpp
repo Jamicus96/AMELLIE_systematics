@@ -25,12 +25,17 @@ class rectangle {
         rectangle(double X_maxi, double X_mini, double Y_maxi, double Y_mini);
 
         // Memeber function
+        const double& X_max() const;
+        const double& X_min() const;
+        const double& Y_max() const;
+        const double& Y_min() const;
+
         double& X_max();
         double& X_min();
         double& Y_max();
         double& Y_min();
 
-        bool check_point_inside_rectangle(const double point_x, const double point_y);
+        bool check_point_inside_rectangle(const double point_x, const double point_y) const;
 };
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */

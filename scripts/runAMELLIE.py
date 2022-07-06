@@ -5,7 +5,8 @@ import subprocess
 import json
 import time
 
-# repo address is not getting the full path, only the path from where I run the script
+# If need to rerun jobs from an array, remember that files are labelled with integer one lower than
+# the array number. For example, `qsub -t 3-3 jobScript.job` will give `outputFile_2.root`.
 
 def argparser():
     '''Define arguments'''
@@ -46,8 +47,8 @@ def argparser():
                         default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/region_lims/lim_list.txt', help='Text file with list of region limits to apply. Format per line:\n\
                             direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy')
     parser.add_argument('---step', '-s', type=str, dest='step',
-                    default='all', choices=['sim', 'hist', 'sim-hist', 'FOM', 'slope', 'hist-FOM',
-                                            'hist-Slopes', 'all'],
+                    default='all', choices=['sim', 'hist', 'combi', 'stats', 'sim-hist', 'hist-combi',
+                                            'combi-stats', 'hist-combi-stats',  'all'],
                     help='which step of the process is it in?')
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
                     default=True, help='print and save extra info')
@@ -88,16 +89,12 @@ def checkRepo(repo_address, verbose=False):
 
     return new_address
 
-def filename_format(info, Analysis=False, outer_lims=None):
+def filename_format(info, Analysis=False):
     '''returns string with simulation info to use in filenames'''
     # geo_file[:-4] + '_' + inner_av_material + '_' + LED + '_' + fibre + 'reemis' + reemis + '_abs' + abs
     name = 'AMELLIE_' + info[0][:-4] + '_' + info[1] + '_' + info[2] + '_' + info[3] + '_reemis' + info[4]
     if Analysis:
-        if outer_lims is not None:
-            return name + '_' + str(outer_lims[0]) + '_' + str(outer_lims[1]) + '_' + str(outer_lims[2]) + '_' + str(outer_lims[3]) + '_'\
-                        + str(outer_lims[4]) + '_' + str(outer_lims[5]) + '_' + str(outer_lims[6]) + '_' + str(outer_lims[7])
-        else:
-            return name
+        return name
     else:
         return name + '_abs' + info[5]
 
@@ -110,7 +107,7 @@ def job_str_map(jobName_str, info):
             'sims_': 'M',
             'splitHist_': 'H',
             'tot_hists_': 'T',
-            'slopes_': 'S'
+            'stats_': 'S'
         },
         'geo_file': {
             'snoplusnative.geo': 'a',
@@ -364,14 +361,9 @@ def getHists(args, input_info):
     with open(jobArrayScript_address, "r") as f:
         example_jobArrayScript = f.readlines()
 
-    jobSingleScript_address = repo_address + 'job_scripts/jobSingle.job'
-    with open(jobSingleScript_address, "r") as f:
-        example_jobSingleScript = f.readlines()
-
     # Make sure folders are of the correct format to  use later
     save_sims_folder = checkRepo(args.sim_repo, args.verbose)
     save_splithists_folder = checkRepo(args.splithist_repo, args.verbose)
-    save_tothists_folder = checkRepo(args.tothist_repo, args.verbose)
 
     # Folder for job scripts and command lists they use
     jobScript_repo = save_sims_folder + 'job_scripts/'
@@ -417,10 +409,24 @@ def getHists(args, input_info):
     # Wait until these job arrays are done
     checkJobsDone('splitHist_', input_info, 10, args.verbose)
 
-    ### ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ###
+    return True
 
-    ### MAKE JOB SCRIPTS TO COMBINE HISTOGRAMS ###
-    print('Creating combine hists job scripts...')
+def combiHists(args, input_info):
+    '''Combine split histograms together'''
+    print('Running combiHists().')
+
+    # Read in example macro and job script + info
+    repo_address = getRepoAddress()
+
+    # Make sure folders are of the correct format to  use later
+    save_splithists_folder = checkRepo(args.splithist_repo, args.verbose)
+    save_tothists_folder = checkRepo(args.tothist_repo, args.verbose)
+
+    jobSingleScript_address = repo_address + 'job_scripts/jobSingle.job'
+    with open(jobSingleScript_address, "r") as f:
+        example_jobSingleScript = f.readlines()
+
+    # Making job scripts
     hist_command_base = 'hadd ' + save_tothists_folder + 'tot_hists_'
     job_addresses = []
     for info in input_info:
@@ -441,53 +447,123 @@ def getHists(args, input_info):
             print('Running command: ', command)
         subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
 
-    return True
-
-
 ### Analysis functions ###
 
-def MakeSlopeCommand(input_info, line1, line2, outer_lims, repo_address, example_jobScript, save_stats_folder, save_tothists_folder, args):
-    '''Create string of command to run slope code'''
+def getOuterLims(region_lims_list, verbose):
+    '''Create string of outer region limits with a space between each, to be used in commands.'''
 
-    # Create command
-    slope_command_base = repo_address + 'scripts/GetFOMabsSlope.exe '
-    info_str = filename_format(input_info[line1], True, outer_lims)  # Same as usual but without absorption and with outer region lims
-    output_stats_file = save_stats_folder + 'slopeStats_' + info_str + '.txt'
-    output_root_file = save_stats_folder + 'Regions_' + info_str + '.root'
-    slope_command = slope_command_base + args.list_file + ' ' + str(line1) + ' ' + str(line2) + ' ' + save_tothists_folder + ' '\
-                    + output_stats_file + ' ' + str(int(args.verbose)) + ' ' + output_root_file + ' ' + str(outer_lims[0]) + ' '\
-                    + str(outer_lims[1]) + ' ' + str(outer_lims[2]) + ' ' + str(outer_lims[3]) + ' ' + str(outer_lims[4]) + ' '\
-                    + str(outer_lims[5]) + ' ' + str(outer_lims[6]) + ' ' + str(outer_lims[7])
+    outer_lims_list = []
+    for region_lims in region_lims_list:
+        if verbose:
+            print('direct_x_max=', region_lims[0], ', reflected_x_min=', region_lims[1], ', direct_y_centre=', region_lims[2], ', direct_dy=', region_lims[3], ', reflected_y_centre=', region_lims[4], 'reflected_dy=', region_lims[5])
+        # Package region limits in string format to use in commands
+        # region_lims = [direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy]
+        direct_x_max = str(region_lims[0])
+        direct_x_min = str(-1.0)
+        direct_y_max = str(region_lims[2] + 0.5 * region_lims[3])
+        direct_y_min = str(region_lims[2] - 0.5 * region_lims[3])
+        reflected_x_max = str(1.0)
+        reflected_x_min = str(region_lims[1])
+        reflected_y_max = str(region_lims[4] + 0.5 * region_lims[5])
+        reflected_y_min = str(region_lims[0] - 0.5 * region_lims[5])
+        outer_lims_list.append(direct_x_max + ' ' + direct_x_min + ' ' + direct_y_max + ' ' + direct_y_min + ' ' + reflected_x_max + ' ' + reflected_x_min + ' ' + reflected_y_max + ' ' + reflected_y_min)
+    
+    return outer_lims_list
 
-    return slope_command, output_stats_file
+def makeStatsJobScript(hist_files, info, outer_lims_list, repo_address, save_stats_folder, save_tothists_folder, verbose):
+    '''Create job script and associated command list file to run Analysis on array of same simulations
+    (except absorption factor), with different region limits.'''
 
-def getSlopes(args, input_info):
-    '''Compute slope from FOM computed from different absorption scalings. If verbose flag is
-    true, also records FOM for each different abs file. So, if only an FOM is wanted, just run this
-    and ignore the slope result.'''
-    print('Running getSlopes().')
+    # Folder for job scripts and command lists they use
+    jobScript_repo = save_tothists_folder + 'job_scripts/'
+    jobScript_repo = checkRepo(jobScript_repo, verbose)
 
-    # Read in example macro and job script + info
-    repo_address = getRepoAddress()
+    # For each set of absorptions, apply all the region limits
+    commandList_address = jobScript_repo + 'stats_commandList_' + filename_format(info, True) + '.txt'
+    commandList_file = open(commandList_address, 'w')
+    output_stats_files = []
+    for i in range(len(outer_lims_list)):
+        outer_lims = outer_lims_list[i]
+        if verbose:
+            print('outer_lims=', outer_lims)
+
+        output_stats_file = save_stats_folder + 'stats_' + filename_format(info, True) + '_' + outer_lims.replace(' ', '_') + '.txt'
+        slope_command = repo_address + 'scripts/GetStats.exe ' + output_stats_file + ' ' + outer_lims + ' ' + str(int(verbose)) + ' ' + hist_files
+        commandList_file.write(slope_command)
+        output_stats_files.append(output_stats_file)
+        if i != len(outer_lims_list) - 1:
+            commandList_file.write('\n')
+    commandList_file.close()
 
     jobArrayScript_address = repo_address + 'job_scripts/jobArray.job'
     with open(jobArrayScript_address, "r") as f:
         example_jobArrayScript = f.readlines()
+
+    job_address = makeJobArrayScript('stats_', example_jobArrayScript, save_tothists_folder, commandList_address, info, verbose)
+
+    return job_address, output_stats_files
+
+def writeJsonStatsFile(output_info, region_lims_list, json_stats_folder):
+    '''Write all stats to json files'''
+
+    for output_stats_file_list, info, abs_factors in output_info:
+        # Write sim info
+        table = {}
+        table['geo_file'] = info[0]
+        table['inner_av_material'] = info[1]
+        table['LED'] = info[2]
+        table['fibre'] = info[3]
+        table['reemis'] = info[4]
+
+        # Write results for each region applied
+        table['regions'] = []
+        for i in range(len(output_stats_file_list)):
+            output_stats_file = output_stats_file_list[i]
+            region_lims = region_lims_list[i]
+            table['regions'].append({})
+
+            # Read in results to make json table for easier use
+            with open(output_stats_file, "r") as f:
+                stats = f.readlines()
+
+            table['regions'][i]['region_lims'] = {}
+            table['regions'][i]['region_lims']['direct_x_max'] = region_lims[0]
+            table['regions'][i]['region_lims']['reflected_x_min'] = region_lims[1]
+            table['regions'][i]['region_lims']['direct_y_centre'] = region_lims[2]
+            table['regions'][i]['region_lims']['direct_dy'] = region_lims[3]
+            table['regions'][i]['region_lims']['reflected_y_centre'] = region_lims[4]
+            table['regions'][i]['region_lims']['reflected_dy'] = region_lims[5]
+
+            # Get stats for each individual absorption factor
+            table['regions'][i]['stats'] = {}
+            for j in range(len(stats)):
+                absorb = abs_factors[j]
+                stats_info = stats[j].split(' ')  # [tot_hits, direct_hits, reflected_hits]
+                table['regions'][i]['stats'][absorb] = {}
+                table['regions'][i]['stats'][absorb]['tot_hits'] = int(stats_info[0])
+                table['regions'][i]['stats'][absorb]['direct_hits'] = int(stats_info[1])
+                table['regions'][i]['stats'][absorb]['reflected_hits'] = int(stats_info[2])
+
+        # Save table to json file
+        save_file = json_stats_folder + 'FinalStats_' + filename_format(info, True) + '.json'
+        with open(save_file, 'w') as f:
+            json.dump(table, f)
+
+def getStats(args, input_info):
+    '''Compute stats (number of hits in direct and reflected regions, and total hits) from different absorption scalings.
+    If verbose flag is true, also create 2-D hists with regions overlain.'''
+    print('Running getStats().')
+
+    # Read in example macro and job script + info
+    repo_address = getRepoAddress()
 
     # Make sure folders are of the correct format to  use later
     save_tothists_folder = checkRepo(args.tothist_repo, args.verbose)
     save_stats_folder = checkRepo(args.stats_repo, args.verbose)
     json_stats_folder = checkRepo(args.json_repo, args.verbose)
 
-    # Folder for job scripts and command lists they use
-    jobScript_repo = save_tothists_folder + 'job_scripts/'
-    jobScript_repo = checkRepo(jobScript_repo, args.verbose)
-
     # Wait until previous jobs are done
     checkJobsDone('tot_hists_', input_info, 10, args.verbose)
-
-    ### MAKE JOB SCRIPTS TO RUN ANALYSIS ###
-    print('Creating analysis job scripts...')
 
     # Apply region limits from list
     if args.verbose:
@@ -497,132 +573,57 @@ def getSlopes(args, input_info):
     textFile.close()
     region_lims_list = np.asarray(lines).astype(np.float)
 
-    outer_lims_list = np.zeros((len(region_lims_list), 8))
-    for i in range(len(region_lims_list)):
-        region_lims = region_lims_list[i]
-        if args.verbose:
-            print('direct_x_max=', region_lims[0], ', reflected_x_min=', region_lims[1], ', direct_y_centre=', region_lims[2], ', direct_dy=', region_lims[3], ', reflected_y_centre=', region_lims[4], 'reflected_dy=', region_lims[5])
-        # Package region limits in string format to use in commands
-        # region_lims = [direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy]
-        direct_x_max = region_lims[0]
-        direct_x_min = -1.0
-        direct_y_max = region_lims[2] + 0.5 * region_lims[3]
-        direct_y_min = region_lims[2] - 0.5 * region_lims[3]
-        reflected_x_max = 1.0
-        reflected_x_min = region_lims[1]
-        reflected_y_max = region_lims[4] + 0.5 * region_lims[5]
-        reflected_y_min = region_lims[0] - 0.5 * region_lims[5]
-        outer_lims_list[i] = np.array([direct_x_max, direct_x_min, direct_y_max, direct_y_min, reflected_x_max, reflected_x_min, reflected_y_max, reflected_y_min])
+    # Get outer region limit strings
+    outer_lims_list = getOuterLims(region_lims_list, args.verbose)
 
-    lines = []
-    job_addresses = []
-    output_stats_files = []
-    line1 = 0
-    line2 = 0
-    i = 0
-    for info in input_info:
+
+    ### MAKE JOB SCRIPTS TO RUN ANALYSIS ###
+    print('Creating analysis job scripts...')
+    jobScript_addresses = []
+    output_info = []
+    abs_factors = []
+    info_1 = input_info[0]
+    hist_files = ''
+    for i in range(len(input_info)):
+        info = input_info[i]
         if args.verbose:
             print('geo_file=', info[0], ', inner_av_material=', info[1], ', LED=', info[2], ', fibre=', info[3], ', reemis=', info[4], ', abs=', info[5])
+        # Check whether to add arguments to current command, or start new one
+        is_same = info_1[0] == info[0] and info_1[1] == info[1] and info_1[2] == info[2] and info_1[3] and info_1[4] == info[4]
+        tot_hist_file_address = save_tothists_folder + 'tot_hists_' + filename_format(info) + '.root'
 
-        # Check if all info except absorption is still the same
-        is_same = input_info[line1, 0] == info[0] and input_info[line1, 1] == info[1] and input_info[line1, 2] == info[2] and input_info[line1, 3] == info[3] and input_info[line1, 4] == info[4]
-        if not is_same or i == len(input_info) - 1:
-            if i != len(input_info) - 1:
-                line2 = i
-            # For each set of absorptions, apply all the region limits
-            commandList_address = jobScript_repo + 'slopes_commandList_' + filename_format(input_info[line1], True) + '.txt'
-            commandList_file = open(commandList_address, 'w')
-
-            output_stats_files_temp = []
-            for j in range(len(outer_lims_list)):
-                outer_lims = outer_lims_list[j]
-                if args.verbose:
-                    print('direct_x_max=', outer_lims[0], 'direct_x_min=', outer_lims[1], 'direct_y_max=', outer_lims[2], 'direct_y_min=', outer_lims[3],
-                    'reflected_x_max=', outer_lims[4], 'reflected_x_min=', outer_lims[5], 'reflected_y_max=', outer_lims[6], 'reflected_y_min=', outer_lims[7])
-                slope_command, new_output_stats_file = MakeSlopeCommand(input_info, line1, line2, outer_lims, repo_address, example_jobArrayScript, save_stats_folder, save_tothists_folder, args)
-                output_stats_files_temp.append(new_output_stats_file)
-                commandList_file.write(slope_command)
-                if i != len(input_info) - 1 or j != len(outer_lims_list):
-                    commandList_file.write('\n')
-            output_stats_files.append(output_stats_files_temp)
-            lines.append(line1)
-            commandList_file.close()
-
-            # Create the job script to run all these macros in an array
-            new_job_address = makeJobArrayScript('slopes_', example_jobArrayScript, save_tothists_folder, commandList_address, input_info[line1], args.verbose)
-            job_addresses.append(new_job_address)
-            line1 = line2 + 1
-        line2 = i
-        i += 1
+        # Group up files which are the same except for absorption scaling
+        if is_same:
+            hist_files += ' ' + tot_hist_file_address
+            abs_factors.append(info[5])
+        else:
+            jobScript_address, output_stats_files = makeStatsJobScript(hist_files, info, outer_lims_list, repo_address, save_stats_folder, save_tothists_folder, args.verbose)
+            jobScript_addresses.append(jobScript_address)
+            output_info.append((output_stats_files, info_1, abs_factors))
+            abs_factors = []
+            hist_files = tot_hist_file_address
+            info_1 = info
+            abs_factors.append(info[5])
+        if i == len(input_info) - 1:
+            jobScript_address, output_stats_files = makeStatsJobScript(hist_files, info, outer_lims_list, repo_address, save_stats_folder, save_tothists_folder, args.verbose)
+            jobScript_addresses.append(jobScript_address)
+            output_info.append((output_stats_files, info_1, abs_factors))
 
 
     ### RUN JOB SCRIPTS ###
     print('Submitting job(s)...')
-    for job_address in job_addresses:
+    for job_address in jobScript_addresses:
         command = 'qsub -t 1-' + str(len(outer_lims_list)) + ' -tc ' + str(args.max_jobs) + ' ' + job_address
         if args.verbose:
             print('Running command: ', command)
         subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
 
     # Wait until these job arrays are done
-    checkJobsDone('slopes_', input_info, 10, args.verbose)
-
+    checkJobsDone('stats_', input_info, 10, args.verbose)
 
     ### READ STATS AND WRITE TO JSON FILE ###
-
-    for i in range(len(output_stats_files)):
-        output_stats_file_list = output_stats_files[i]
-        line1 = lines[i]
-
-        # Write sim info
-        table = {}
-        table['geo_file'] = input_info[line1, 0]
-        table['inner_av_material'] = input_info[line1, 1]
-        table['LED'] = input_info[line1, 2]
-        table['fibre'] = input_info[line1, 3]
-        table['reemis'] = input_info[line1, 4]
-
-        # Write results for each region applied
-        table['stats'] = []
-        for j in range(len(output_stats_file_list)):
-            output_stats_file = output_stats_file_list[j]
-            table['stats'].append({})
-
-            # Read in results to make json table for easier use
-            with open(output_stats_file, "r") as f:
-                stats = f.readlines()
-            
-            # Get region limits
-            outer_lims = outer_lims_list[j]
-            # Check those in the stats file match
-            for n in range(len(outer_lims)):
-                stat_nums = stats[0].split(' ')
-                if outer_lims[n] != float(stat_nums[n]):
-                    print('Stats do not match: ', outer_lims[n], ', ', float(stats[0][n]))
-                    exit(1)
-            # From: [direct_x_max, direct_x_min, direct_y_max, direct_y_min, reflected_x_max, reflected_x_min, reflected_y_max, reflected_y_min]
-            # To: [direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy]
-            table['stats'][j]['region_lims'] = {}
-            table['stats'][j]['region_lims']['direct_x_max'] = float(outer_lims[0])
-            table['stats'][j]['region_lims']['reflected_x_min'] = float(outer_lims[5])
-            table['stats'][j]['region_lims']['direct_y_centre'] = 0.5 * (float(outer_lims[2]) + float(outer_lims[3]))
-            table['stats'][j]['region_lims']['direct_dy'] = float(outer_lims[2]) - float(outer_lims[3])
-            table['stats'][j]['region_lims']['reflected_y_centre'] = 0.5 * (float(outer_lims[4]) + float(outer_lims[5]))
-            table['stats'][j]['region_lims']['reflected_dy'] = float(outer_lims[4]) - float(outer_lims[5])
-
-            # Get slope, and FOM of inividual absorptions if want extra info
-            table['stats'][j]['slope'] = float(stats[1])
-            if args.verbose:
-                table['stats'][j]['FOMs'] = {}
-                for k in range(2, len(stats)):
-                    info = stats[k].split(' ')  # [abs, FOM]
-                    table['stats'][j]['FOMs'][info[0]] = float(info[1])
-
-        # Save table to json file
-        save_file = json_stats_folder + 'FinalStats_' + filename_format(input_info[line1], True) + '.json'
-        with open(save_file, 'w') as f:
-            json.dump(table, f)
-    i += 1
+    print('Writing stats to json file...')
+    writeJsonStatsFile(output_info, region_lims_list, json_stats_folder)
 
     return True
 
@@ -630,20 +631,32 @@ def getSlopes(args, input_info):
 ### Combined functions ###
 
 def runSims_getHists(args, input_info):
-    '''Run AMELLIE simulations, then get their histograms and recombine'''
+    '''Run AMELLIE simulations, then get their histograms'''
     result = runSims(args, input_info)
     return result and getHists(args, input_info)
 
-def getHists_Slopes(args, input_info):
+def getHists_combine(args, input_info):
+    '''Get simulations histograms and recombine them'''
+    result = getHists(args, input_info)
+    return result and combiHists(args, input_info)
+
+def combine_getStats(args, input_info):
+    '''Recombine histograms and analyse them'''
+    result = combiHists(args, input_info)
+    return result and getStats(args, input_info)
+
+def getHists_Combine_getStats(args, input_info):
     '''Get histograms from simulation outputs, combine and then analyse them.'''
     result = getHists(args, input_info)
-    return result and getSlopes(args, input_info)
+    result = result and combiHists(args, input_info)
+    return result and getStats(args, input_info)
 
-def runAllSlopes(args, input_info):
-    '''Run the whole AMELLIE code, from simulation, through histograms, to analysis'''
+def runAll(args, input_info):
+    '''Run the whole AMELLIE code, from simulation, through histograms, combining, to analysis'''
     result = runSims(args, input_info)
     result = result and getHists(args, input_info)
-    return result and getSlopes(args, input_info)
+    result = result and combiHists(args, input_info)
+    return result and getStats(args, input_info)
 
 
 ### MAIN ###
@@ -668,10 +681,14 @@ def main():
     work_modes = {
         'sim': runSims,
         'hist': getHists,
+        'combi': combiHists,
+        'stats': getStats,
+
         'sim-hist': runSims_getHists,
-        'slope': getSlopes,
-        'hist-Slopes': getHists_Slopes,
-        'all': runAllSlopes
+        'hist-combi': getHists_combine,
+        'combi-stats': combine_getStats,
+        'hist-combi-stats': getHists_Combine_getStats,
+        'all': runAll
     }
 
     result = work_modes[args.step](args, input_info)
