@@ -13,7 +13,7 @@
 
 
 std::vector<std::vector<unsigned int> > GetStats(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<std::string>& hist_file_addresses, bool verbose);
-void DrawRegionLims(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<std::string>& hist_file_addresses, const std::string output_file);
+void DrawRegionLims(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<std::string>& hist_file_addresses, const std::string& output_file);
 
 
 int main(int argc, char** argv) {
@@ -119,7 +119,7 @@ std::vector<std::vector<unsigned int> > GetStats(const rectangle& direct_region,
  * @param hist_file_addresses 
  * @param output_file 
  */
-void DrawRegionLims(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<std::string>& hist_file_addresses, const std::string output_file) {
+void DrawRegionLims(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<std::string>& hist_file_addresses, const std::string& output_file) {
 
     // Create output root file for drawn regions
     std::string root_fileName = output_file.substr(0, output_file.find_last_of(".")) + ".root";
@@ -162,11 +162,12 @@ void DrawRegionLims(const rectangle& direct_region, const rectangle& reflected_r
             lines[i].Draw("SAME");
         }
 
+        // Write to file
         c1->Write();
+        root_file->Write();
         delete c1;
     }
 
-    // Write to file and close
-    root_file->Write();
+    // Close
     root_file->Close();
 }
