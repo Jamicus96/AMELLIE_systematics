@@ -41,7 +41,7 @@ def argparser():
                             (fyi for ABSLENGTH_SCALING: 0 = LAB, 1 = PPO, 2 = Te-Diol, 3 = bisMSB).')
 
     parser.add_argument('--list', '-l', type=str, dest='list_file',
-                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/info_lists/Te_list.txt', help='Text file with list of sim stats. Format per line:\n\
+                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/info_lists/list.txt', help='Text file with list of sim stats. Format per line:\n\
                             geo_file.geo, LED, fibre, reemis, abs')
     parser.add_argument('--region_lims', '-r', type=str, dest='region_lims',
                         default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/region_lims/lim_list.txt', help='Text file with list of region limits to apply. Format per line:\n\
