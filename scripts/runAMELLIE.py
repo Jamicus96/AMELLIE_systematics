@@ -35,10 +35,14 @@ def argparser():
                         default=500, help='Max number of events to simulate per macro (simulations will be split up to this amount).')
     parser.add_argument('--max_jobs', '-m', type=int, dest='max_jobs',
                         default=70, help='Max number of tasks in an array running at any one time.')
-    parser.add_argument('--abs_nominal', '-a', type=list, dest='abs_nominal',
-                        default=[1.5, 0.55],
+    parser.add_argument('--abs_nominal', '-ab', type=str, dest='abs_nominal',
+                        default='[ 1.5, 0.55, ]',
                         help='Original absorption scaling from optics file being used. Ex: ABSLENGTH_SCALING: [ 1.5, 0.55, ],.\n\
                             (fyi for ABSLENGTH_SCALING: 0 = LAB, 1 = PPO, 2 = Te-Diol, 3 = bisMSB).')
+    parser.add_argument('--rs_nominal', '-rs', type=str, dest='rs_nominal',
+                        default='[1.176,]',
+                        help='Original reemission and scattering scaling from optics file being used. Ex: RSLENGTH_SCALING: [1.176,],.\n\
+                            (fyi for RSLENGTH_SCALING: 0 = scale full scintilaltor mix I think).')
 
     parser.add_argument('--list', '-l', type=str, dest='list_file',
                         default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/info_lists/list.txt', help='Text file with list of sim stats. Format per line:\n\
@@ -237,17 +241,26 @@ def checkJobsDone(jobName_substr, input_info, wait_time, verbose):
 
 ### Simulation functions ###
 
-def makeMacros(example_macro, save_macro_folder, save_sims_folder, abs_nominal, info, nevts, idx):
+def makeMacros(example_macro, save_macro_folder, save_sims_folder, abs_nominal, rs_nominal, info, nevts, idx):
     '''Make and save macro according to provided parameters'''
 
-    # Modify by factor abs_scaling_fact
+    # Modify absorption by factor abs_scaling_fact
     abs_scaling_fact = float(info[5])
+    abs_nominal = abs_nominal.strip('[').strip(']').strip(' ').split(',')
     abs_scaling = '['
     for absorb in abs_nominal:
-        abs_scaling += str(absorb * abs_scaling_fact) + ', '
-    if len(abs_nominal) == 4:
-        abs_scaling = abs_scaling[:-2]
+        if absorb != '':
+            abs_scaling += str(float(absorb) * abs_scaling_fact) + ', '
     abs_scaling += ']'
+
+    # Modify reemission and scattering by factor rs_scaling_fact
+    rs_scaling_fact = float(info[4])
+    rs_nominal = rs_nominal.strip('[').strip(']').strip(' ').split(',')
+    rs_scaling = '['
+    for reemission in rs_nominal:
+        if reemission != '':
+            rs_scaling += str(float(reemission) * rs_scaling_fact) + ', '
+    rs_scaling += ']'
 
     # AMELLIE_geoFile_LEDnum_fibre_reemis_abs.root
     new_macro_address = save_macro_folder + 'macro_' + filename_format(info) + '_' + str(idx) + '.mac'
@@ -255,26 +268,25 @@ def makeMacros(example_macro, save_macro_folder, save_sims_folder, abs_nominal, 
 
     new_macro = []
     for line in example_macro:
+        new_line = line
         # Replace placeholders in macro
         if 'geo/YOUR_FAV_GEO_FILE.geo' in line:
-            new_line = line.replace('YOUR_FAV_GEO_FILE.geo', info[0], 1)
-        elif 'YOUR_INNER_AV_MATERIAL' in line:
-            if info[1] == '':
-                new_line = ''
-            else:
-                new_line = line.replace('YOUR_INNER_AV_MATERIAL', info[1], 1)
-        elif 'YOUR_FAV_LED' in line:
-            new_line = line.replace('YOUR_FAV_LED', info[2], 1)
-        elif 'YOUR_FAV_FIBRE' in line:
-            new_line = line.replace('YOUR_FAV_FIBRE', info[3], 1)
-        elif '/PATH/TO/YOUR/OUTPUT/FILE.root' in line:
-            new_line = line.replace('/PATH/TO/YOUR/OUTPUT/FILE.root', output_address, 1)
-        elif '/rat/run/start 2000' in line:
-            new_line = line.replace('/rat/run/start 2000', '/rat/run/start ' + str(nevts), 1)
-        elif 'ABSLENGTH_SCALING [1.9, 2.0, 2.0, 0.0]' in line:
-            new_line = line.replace('[1.9, 2.0, 2.0, 0.0]', abs_scaling, 1)
-        else:
-            new_line = line
+            new_line = new_line.replace('YOUR_FAV_GEO_FILE.geo', info[0], 1)
+        if 'YOUR_INNER_AV_MATERIAL' in line:
+            new_line = new_line.replace('YOUR_INNER_AV_MATERIAL', info[1], 1)
+        if 'YOUR_FAV_LED' in line:
+            new_line = new_line.replace('YOUR_FAV_LED', info[2], 1)
+        if 'YOUR_FAV_FIBRE' in line:
+            new_line = new_line.replace('YOUR_FAV_FIBRE', info[3], 1)
+        if '/PATH/TO/YOUR/OUTPUT/FILE.root' in line:
+            new_line = new_line.replace('/PATH/TO/YOUR/OUTPUT/FILE.root', output_address, 1)
+        if '/rat/run/start 2000' in line:
+            new_line = new_line.replace('/rat/run/start 2000', '/rat/run/start ' + str(nevts), 1)
+        if 'ABSLENGTH_SCALING [LAB, PPO, Te-Diol, bisMSB,]' in line:
+            new_line = new_line.replace('[LAB, PPO, Te-Diol, bisMSB,]', abs_scaling, 1)
+        if 'RSLENGTH_SCALING [SCINT-MIX,]' in line:
+            new_line = new_line.replace('[SCINT-MIX,]', rs_scaling, 1)
+            
 
         new_macro.append(new_line)
     
@@ -326,7 +338,7 @@ def runSims(args, input_info):
         commandList_file = open(commandList_address, 'w')
         for i in range(len(n_evts)):
             # Create all the macros
-            macro_address = makeMacros(example_macro, save_macro_folder, save_sims_folder, args.abs_nominal, info, n_evts[i], i)
+            macro_address = makeMacros(example_macro, save_macro_folder, save_sims_folder, args.abs_nominal, args.rs_nominal, info, n_evts[i], i)
             log_file_address = save_macro_folder + 'log_files/ratLog_' + filename_format(info) + '.log'
             macro_command = 'rat ' + macro_address + ' -l ' + log_file_address # + ' -s ' + random_seed
             commandList_file.write(macro_command + '\n')
