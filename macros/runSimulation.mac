@@ -34,8 +34,8 @@
 /rat/db/set ELLIE fibre_id "YOUR_FAV_FIBRE"
 
 # these lines show how to change optical parameters
-/rat/db/set OPTICS[te_diol_dda_0p5_labppo_scintillator_bisMSB_Jan2018] ABSLENGTH_SCALING [1.9, 2.0, 2.0, 0.0]
-/rat/db/set OPTICS[te_diol_dda_0p5_labppo_scintillator_bisMSB_Jan2018] RSLENGTH_SCALING [1.3566, 1.3566, 1.3566, 1.3566]
+/rat/db/set OPTICS[YOUR_INNER_AV_MATERIAL] ABSLENGTH_SCALING [LAB, PPO, Te-Diol, bisMSB,]
+/rat/db/set OPTICS[YOUR_INNER_AV_MATERIAL] RSLENGTH_SCALING [SCINT-MIX,]
 
 /run/initialize
 

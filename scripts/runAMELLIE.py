@@ -16,17 +16,17 @@ def argparser():
         description='Run AMELLIE simulation and subsequent analysis code for list of sim info')
 
     parser.add_argument('--macro_repo', '-mar', type=str, dest='macro_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/macros/', help='Folder to save Region-selected root files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/2p2gL/MC/macros/', help='Folder to save Region-selected root files in.')
     parser.add_argument('--sim_repo', '-sir', type=str, dest='sim_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/sims/', help='Folder to save intial root files from AMELLIE simulations in.')
+                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/2p2gL/MC/sims/', help='Folder to save intial root files from AMELLIE simulations in.')
     parser.add_argument('--splithist_repo', '-shir', type=str, dest='splithist_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/split_hists/', help='Folder to save uncombined root files with tracking information in.')
+                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/2p2gL/MC/split_hists/', help='Folder to save uncombined root files with tracking information in.')
     parser.add_argument('--tothist_repo', '-thir', type=str, dest='tothist_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/tot_hists/', help='Folder to save recombined root files with tracking information in.')
+                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/2p2gL/MC/tot_hists/', help='Folder to save recombined root files with tracking information in.')
     parser.add_argument('--stats_repo', '-str', type=str, dest='stats_repo',
-                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/stats/', help='Folder to save stats txt files in.')
+                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/2p2gL/MC/stats/', help='Folder to save stats txt files in.')
     parser.add_argument('--json_repo', '-jsr', type=str, dest='json_repo',
-                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/final_stats/',
+                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/2p2gL/results/',
                         help='Folder to json file with final stats in.')
 
     parser.add_argument('--nevts_total', '-N', type=int, dest='nevts_total',
@@ -36,7 +36,7 @@ def argparser():
     parser.add_argument('--max_jobs', '-m', type=int, dest='max_jobs',
                         default=70, help='Max number of tasks in an array running at any one time.')
     parser.add_argument('--abs_nominal', '-ab', type=str, dest='abs_nominal',
-                        default='[ 1.5, 0.55, ]',
+                        default='[ 1.0, 1.1, 1.0, ]',
                         help='Original absorption scaling from optics file being used. Ex: ABSLENGTH_SCALING: [ 1.5, 0.55, ],.\n\
                             (fyi for ABSLENGTH_SCALING: 0 = LAB, 1 = PPO, 2 = Te-Diol, 3 = bisMSB).')
     parser.add_argument('--rs_nominal', '-rs', type=str, dest='rs_nominal',
@@ -45,10 +45,10 @@ def argparser():
                             (fyi for RSLENGTH_SCALING: 0 = scale full scintilaltor mix I think).')
 
     parser.add_argument('--list', '-l', type=str, dest='list_file',
-                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/info_lists/list.txt', help='Text file with list of sim stats. Format per line:\n\
+                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/2p2gL/list_info/list.txt', help='Text file with list of sim stats. Format per line:\n\
                             geo_file.geo, LED, fibre, reemis, abs')
     parser.add_argument('--region_lims', '-r', type=str, dest='region_lims',
-                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/Sim/Slopes/region_lims/lim_list.txt', help='Text file with list of region limits to apply. Format per line:\n\
+                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/2p2gL/list_inf/lim_list.txt', help='Text file with list of region limits to apply. Format per line:\n\
                             direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy')
     parser.add_argument('---step', '-s', type=str, dest='step',
                     default='all', choices=['sim', 'hist', 'combi', 'stats', 'sim-hist', 'hist-combi',
