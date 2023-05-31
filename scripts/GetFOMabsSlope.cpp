@@ -173,9 +173,9 @@ std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region
     int NbinsX = allPathsHist->GetNbinsX();
     int NbinsY = allPathsHist->GetNbinsY();
     if (verbose) {std::cout << "NbinsX = " << NbinsX << ", NbinsY = " << NbinsY << std::endl;}
-    for (int x = 1; x < NbinsX + 1; x++) {  // loop over histogram bins
+    for (unsigned int x = 1; x < NbinsX + 1; x++) {  // loop over histogram bins
         double xBinCenter = allPathsHist->GetXaxis()->GetBinCenter(x);
-        for (int y = 1; y < NbinsY + 1; y++) {
+        for (unsigned int y = 1; y < NbinsY + 1; y++) {
             double yBinCenter = allPathsHist->GetYaxis()->GetBinCenter(y);
             if (direct_region.check_point_inside_rectangle(xBinCenter, yBinCenter)) {
                 direct_count += allPathsHist->GetBinContent(x,y);
@@ -234,7 +234,7 @@ void DrawRegionLims(rectangle direct_region, rectangle reflected_region, TH2F *a
     lines.push_back(TLine(reflected_region.X_min(), reflected_region.Y_max(), reflected_region.X_max(), reflected_region.Y_max()));
 
     // draw lines
-    for(unsigned int i = 0; i < lines.size(); ++i){
+    for (unsigned int i = 0; i < lines.size(); ++i) {
         lines[i].SetLineColor(kBlack);
         lines[i].Draw("SAME");
     }
@@ -266,7 +266,7 @@ std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_re
     std::vector<std::string> traking_files;
     std::vector<std::string> abs1_idx = {"-1"};  // Index in abs_scalings where abs=1.0
 
-    int i = 0;
+    unsigned int i = 0;
     std::string delimiter = ", ";
     std::size_t pos; std::size_t pos_1;
     std::string substr;
