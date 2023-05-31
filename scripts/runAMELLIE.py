@@ -119,7 +119,8 @@ def job_str_map(jobName_str, info):
         },
         'inner_av_material': {
             '': 'A',
-            'labppo_1p1_berkeley_scintillator': 'B'
+            'labppo_1p1_berkeley_scintillator': 'B',
+            'labppo_2p2_scintillator': 'C'
         },
         'LED': {
             'LED403': 'a'
