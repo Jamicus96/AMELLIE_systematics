@@ -48,7 +48,7 @@ def argparser():
                         default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/2p2gL/list_info/list.txt', help='Text file with list of sim stats. Format per line:\n\
                             geo_file.geo, LED, fibre, reemis, abs')
     parser.add_argument('--region_lims', '-r', type=str, dest='region_lims',
-                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/2p2gL/list_inf/lim_list.txt', help='Text file with list of region limits to apply. Format per line:\n\
+                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/2p2gL/list_info/lim_list.txt', help='Text file with list of region limits to apply. Format per line:\n\
                             direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy')
     parser.add_argument('---step', '-s', type=str, dest='step',
                     default='all', choices=['sim', 'hist', 'combi', 'stats', 'sim-hist', 'hist-combi',
