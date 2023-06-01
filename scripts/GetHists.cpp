@@ -105,8 +105,7 @@ void GetLightPaths(std::string input_file, std::string output_file, std::string 
 
     // Create histograms
     TH1D *h1DResTimeAll_raw = new TH1D("g", "Residual Hit Time, not reajusted", 1000, -50., 500.);
-    TH1D *h1DResTimeAll = new TH1D("h1DResTimeAll", "Residual Hit Time", 1000, -50., 250.);
-    TH2F *hPMTResTimeCosTheta = new TH2F("hPmtResTimeVsCosTheta", "title",1000, -1., 1., 1000, -50., 250.);
+    TH2F *hPMTResTimeCosTheta = new TH2F("hPmtResTimeVsCosTheta", "title", 1000, -1., 1., 1000, -50., 250.);
 
     size_t entryCount = dsreader.GetEntryCount(); //number of entries, want to loop over each one
     std::vector<Double_t> evPMTTimes;
@@ -147,15 +146,12 @@ void GetLightPaths(std::string input_file, std::string output_file, std::string 
     // calculate time residuals (ajusted)
     //std::cout << "peak_time = " << peak_time << std::endl;
     for (size_t i_evpmt = 0; i_evpmt < pmtID.size(); ++i_evpmt) {
-        h1DResTimeAll->Fill(evPMTTimes[i_evpmt] - peak_time);
-        // cos(theta) hist
         hPMTResTimeCosTheta->Fill(cosTheta[pmtID[i_evpmt]], evPMTTimes[i_evpmt] - peak_time);
     }
 
     //now write everything
     rootfile->cd();
     hPMTResTimeCosTheta->Write();
-    h1DResTimeAll->Write();
     h1DResTimeAll_raw->Write();
     rootfile->Write();
     rootfile->Close();

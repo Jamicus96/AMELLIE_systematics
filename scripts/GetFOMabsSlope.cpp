@@ -12,10 +12,10 @@
 #include "AMELLIE_utils.hpp"
 
 
-std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool verbose,  std::string outRoot_filename = "Regions.root");
-std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist, bool verbose);
-void DrawRegionLims(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist, double abs);
-std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file, unsigned int first_line, unsigned int last_line, bool verbose);
+std::vector<double> create_lims(const double min, const double max, const unsigned int N);
+double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<TH2F*>& hists, const std::vector<double>& abs_scalings, const int abs1_idx, const bool verbose);
+std::vector<double> getRatio(const rectangle& direct_region, const rectangle& reflected_region, TH2F* allPathsHist, const bool verbose);
+std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file, const unsigned int first_line, const unsigned int last_line, const bool verbose);
 
 
 
@@ -29,79 +29,99 @@ int main(int argc, char** argv) {
     std::string output_file = argv[5];
     // record extra info?
     bool verbose = std::stoi(argv[6]);
-    std::string output_root_filename = argv[7];
-    // Read in region limits
-    double direct_x_max = std::stod(argv[8]);
-    double direct_x_min = std::stod(argv[9]);
-    double direct_y_max = std::stod(argv[10]);
-    double direct_y_min = std::stod(argv[11]);
-    double reflected_x_max = std::stod(argv[12]);
-    double reflected_x_min = std::stod(argv[13]);
-    double reflected_y_max = std::stod(argv[14]);
-    double reflected_y_min = std::stod(argv[15]);
 
-    // Set up regions
-    rectangle direct_region = rectangle(direct_x_max, direct_x_min, direct_y_max, direct_y_min);
-    rectangle reflected_region = rectangle(reflected_x_max, reflected_x_min, reflected_y_max, reflected_y_min);
-
-    //Create list of tracking hist file name from info file, and list abs_scalings
-
+    // Create list of tracking hist file names from info file, and list abs_scalings
     std::vector<std::vector<std::string> > file_info = readInfoFile(tracking_hist_repo, info_file, first_line, last_line, verbose);
 
-    std::vector<std::string> traking_files = file_info.at(0);
+    // Unpack info
     unsigned int abs1_idx = std::stoi(file_info.at(2).at(0));
     std::vector<double> abs_scalings;
-    for (unsigned int i = 0; i < traking_files.size(); ++i) {
+    std::vector<TH2F*> hists;
+    for (unsigned int i = 0; i < file_info.at(0).size(); ++i) {
         abs_scalings.push_back(std::stod(file_info.at(1).at(i)));
+        hists.push_back(GetHist(file_info.at(0).at(i), "hPmtResTimeVsCosTheta"));
     }
 
-    // Get FOM/abs slope + FOM points
-    std::vector<std::vector<double> > results = GetFOMabsSlope(direct_region, reflected_region, traking_files, abs_scalings, abs1_idx, verbose, output_root_filename);
-    double slope = results.at(0).at(0);
-    std::vector<double> FOM = results.at(1);  // normalised FOM (reflected / direct)
-    std::vector<double> FOM_err = results.at(2);  // normalised FOM stat errors
+    // Create reagion lims to iterate over (6 values):
+    double dir_x_max_min = -0.99; double dir_x_max_max = -0.7;
+    double ref_x_min_min = 0.7; double ref_x_min_max = 0.99;
+    double dir_t_cen_min = -10.0; double dir_t_cen_max = 10.0;
+    double ref_t_cen_min = -10.0; double ref_t_cen_max = 10.0;
+    double dir_t_wid_min = 1.0; double dir_t_wid_max = 30.0;
+    double ref_t_wid_min = 1.0; double ref_t_wid_max = 30.0;
 
-    // Print it to file, after region info
+    unsigned int N = 10;
+    std::vector<double> dir_x_max_lims = create_lims(dir_x_max_min, dir_x_max_max, N);
+    std::vector<double> ref_x_min_lims = create_lims(ref_x_min_min, ref_x_min_max, N);
+    std::vector<double> dir_t_cen_lims = create_lims(dir_t_cen_min, dir_t_cen_max, N);
+    std::vector<double> ref_t_cen_lims = create_lims(ref_t_cen_min, ref_t_cen_max, N);
+    std::vector<double> dir_t_wid_lims = create_lims(dir_t_wid_min, dir_t_wid_max, N);
+    std::vector<double> ref_t_wid_lims = create_lims(ref_t_wid_min, ref_t_wid_max, N);
+
+    // Set up regions
+    rectangle direct_region = rectangle(dir_x_max_lims.at(0), -1.0, dir_t_cen_lims.at(0) + 0.5 * dir_t_wid_lims.at(0), dir_t_cen_lims.at(0) - 0.5 * dir_t_wid_lims.at(0));
+    rectangle reflected_region = rectangle(1.0, ref_x_min_lims.at(0), ref_t_cen_lims.at(0) + 0.5 * ref_t_wid_lims.at(0), ref_t_cen_lims.at(0) - 0.5 * ref_t_wid_lims.at(0));
+
+    // Loop through all region lims, and compute FOM, and print them to file
     std::ofstream datafile;
     datafile.open(output_file.c_str(), std::ios::trunc);
-    // print region limits first
-    datafile << direct_x_max << " " << direct_x_min << " " << direct_y_max << " " << direct_y_min << " " << reflected_x_max
-             << " " << reflected_x_min << " " << reflected_y_max << " " << reflected_y_min << std::endl;
-    // then print slope (final results)
-    datafile << slope << std::endl;
-    if (verbose) {
-        // print normalised FOM for each absorption
-        for (unsigned int i = 0; i < abs_scalings.size(); ++i) {
-            datafile << abs_scalings.at(i) << " " << FOM.at(i) << " " << FOM_err.at(i) << std::endl;
+    double slope;
+    for (unsigned int i = 0; i < N; ++i) {
+        direct_region.X_max() = dir_x_max_lims.at(i);
+        for (unsigned int j = 0; j < N; ++j) {
+            for (unsigned int k = 0; k < N; ++k) {
+                direct_region.T_max() = dir_t_cen_lims.at(j) + 0.5 * dir_t_wid_lims.at(k);
+                direct_region.T_min() = dir_t_cen_lims.at(j) - 0.5 * dir_t_wid_lims.at(k);
+                for (unsigned int l = 0; l < N; ++l) {
+                    reflected_region.X_min() = ref_x_min_lims.at(l);
+                    for (unsigned int m = 0; m < N; ++m) {
+                        for (unsigned int n = 0; n < N; ++n) {
+                            direct_region.T_max() = ref_t_cen_lims.at(m) + 0.5 * ref_t_wid_lims.at(n);
+                            direct_region.T_min() = ref_t_cen_lims.at(m) - 0.5 * ref_t_wid_lims.at(n);
+
+                            // Compute slope
+                            slope = GetFOMabsSlope(direct_region, reflected_region, hists, abs_scalings, abs1_idx, verbose);
+
+                            // print region limits first, and then slope. All space-separated
+                            datafile << dir_x_max_lims.at(i) << " " << dir_t_cen_lims.at(j) << " " << dir_t_wid_lims.at(k) << " " << ref_x_min_lims.at(l)
+                                     << " " << ref_t_cen_lims.at(m) << " " << ref_t_wid_lims.at(n) << " " << slope << std::endl;
+                        }
+                    }
+                }
+            }
         }
-        std::cout << "num_abs = " << abs_scalings.size() << ", num_FOM" << FOM.size() << std::endl;
     }
+
+    return 0;
 }
 
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
+std::vector<double> create_lims(const double min, const double max, const unsigned int N) {
+    const double step = (max - min) / (double)(N - 1);
+
+    std::vector<double> lims = {min};
+    for (unsigned int n = 0; n < N; ++n) {
+        lims.push_back(min + n * step);
+    }
+
+    return lims;
+}
+
 
 /**
  * @brief Returns FOM/abs slope (called y)
  * 
- * @param traking_files 
+ * @param direct_region 
+ * @param reflected_region 
+ * @param hists 
  * @param abs_scalings 
  * @param abs1_idx 
- * @param points 
+ * @param verbose 
  * @return double 
  */
-std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectangle reflected_region, std::vector<std::string> traking_files, std::vector<double> abs_scalings, int abs1_idx, bool verbose, std::string outRoot_filename) {
-
-    // Read in histograms
-    std::vector<TH2F*> hists;
-    for (unsigned int i = 0; i < traking_files.size(); ++i) {
-        hists.push_back(GetHist(traking_files.at(i), "hPmtResTimeVsCosTheta"));
-    }
-
-    // Set up output histogram
-    TFile *output_file = new TFile(outRoot_filename.c_str(), "RECREATE");
-    output_file->cd();
+double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<TH2F*>& hists, const std::vector<double>& abs_scalings, const int abs1_idx, const bool verbose) {
 
     // Get ratio of hits in both triangular regions, and associated error, then normalise all to the ratio
     // found at abs = 1. Then compute best fit slope of normalised ratio vs abs:
@@ -114,8 +134,6 @@ std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectan
     double S_xy;
     double S_xx;
     std::vector<double> ratio_res = {0.0, 0.0};
-    std::vector<double> ratios;
-    std::vector<double> ratio_errs;
     for (unsigned int n = 0; n < abs_scalings.size(); ++n) {
         // ratio for other abs
         ratio_res = getRatio(direct_region, reflected_region, hists.at(n), verbose);
@@ -131,29 +149,9 @@ std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectan
         // Add to quantities used to find slope (FOM) of ratio vs abs
         S_xy += ((abs_scalings.at(n) - 1.0) * (ratio - 1.0)) / (ratio_err*ratio_err);
         S_xx += ((abs_scalings.at(n) - 1.0) * (abs_scalings.at(n) - 1.0)) / (ratio_err*ratio_err);
-
-        if (verbose) {
-            // Create histogram to show regions on 2D t_res vs cos(theta) histogram
-            DrawRegionLims(direct_region, reflected_region, hists.at(n), abs_scalings.at(n));
-            // Add of vectors
-            ratios.push_back(ratio);
-            ratio_errs.push_back(ratio_err);
-        }
     }
 
-    // write to output file and close
-    output_file->Write();
-    output_file->Close();
-    if (!verbose) {
-        // If root file wasn't used, delete it
-        int status = remove(outRoot_filename.c_str());
-    }
-
-    // package results (main result is slope, but record other things too)
-    std::vector<double> slope = {S_xy / S_xx};
-    std::vector<std::vector<double> > results = {slope, ratios, ratio_errs};
-
-    return results;  // return best fit slope (FOM)
+    return S_xy / S_xx;  // return best fit slope (FOM)
 }
 
 
@@ -163,16 +161,16 @@ std::vector<std::vector<double> > GetFOMabsSlope(rectangle direct_region, rectan
  * @param direct_region 
  * @param reflected_region 
  * @param allPathsHist 
+ * @param verbose
  * @return std::vector<double> 
  */
-std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist, bool verbose) {
+std::vector<double> getRatio(const rectangle& direct_region, const rectangle& reflected_region, TH2F* allPathsHist, const bool verbose) {
 
     // Count number of hits in direct and reflected regions
     double direct_count = 0.0;
     double reflected_count = 0.0;
     int NbinsX = allPathsHist->GetNbinsX();
     int NbinsY = allPathsHist->GetNbinsY();
-    if (verbose) {std::cout << "NbinsX = " << NbinsX << ", NbinsY = " << NbinsY << std::endl;}
     for (unsigned int x = 1; x < NbinsX + 1; x++) {  // loop over histogram bins
         double xBinCenter = allPathsHist->GetXaxis()->GetBinCenter(x);
         for (unsigned int y = 1; y < NbinsY + 1; y++) {
@@ -188,9 +186,6 @@ std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region
         }
     }
 
-    // std::cout << "direct_count = " << direct_count << std::endl;
-    // std::cout << "reflected_count = " << reflected_count << std::endl;
-
     // Compute ratio of both, and associated stat error
     std::vector<double> ratio;
     if (direct_count == 0 || reflected_count == 0) {
@@ -205,55 +200,16 @@ std::vector<double> getRatio(rectangle direct_region, rectangle reflected_region
 
 
 /**
- * @brief Draw 2-D histogram from tracking info with regions overlain.
- * 
- * @param direct_region 
- * @param reflected_region 
- * @param allPathsHist 
- */
-void DrawRegionLims(rectangle direct_region, rectangle reflected_region, TH2F *allPathsHist, double abs) {
-
-    // Draw box cuts on resthit vs costheta hist
-    std::string canvas_name = "hHitTimeResiduals_regions_" + std::to_string(abs);
-    std::string canvas_title = "Hit time residuals vs cos(theta) with Regions Overlain, for abs = " + std::to_string(abs);
-    TCanvas* c1 = new TCanvas(canvas_name.c_str(), canvas_title.c_str());  // Create output canvas to be saved in output file
-    TH2F* h = (TH2F*)allPathsHist->Clone();  // Make a copy to use in canvas
-    h->Draw("colz");  // Draw histogram
-
-    // create lines
-    std::vector<TLine> lines;
-    // direct box
-    lines.push_back(TLine(direct_region.X_min(), direct_region.Y_min(), direct_region.X_min(), direct_region.Y_max()));
-    lines.push_back(TLine(direct_region.X_max(), direct_region.Y_min(), direct_region.X_max(), direct_region.Y_max()));
-    lines.push_back(TLine(direct_region.X_min(), direct_region.Y_min(), direct_region.X_max(), direct_region.Y_min()));
-    lines.push_back(TLine(direct_region.X_min(), direct_region.Y_max(), direct_region.X_max(), direct_region.Y_max()));
-    // reflected box
-    lines.push_back(TLine(reflected_region.X_min(), reflected_region.Y_min(), reflected_region.X_min(), reflected_region.Y_max()));
-    lines.push_back(TLine(reflected_region.X_max(), reflected_region.Y_min(), reflected_region.X_max(), reflected_region.Y_max()));
-    lines.push_back(TLine(reflected_region.X_min(), reflected_region.Y_min(), reflected_region.X_max(), reflected_region.Y_min()));
-    lines.push_back(TLine(reflected_region.X_min(), reflected_region.Y_max(), reflected_region.X_max(), reflected_region.Y_max()));
-
-    // draw lines
-    for (unsigned int i = 0; i < lines.size(); ++i) {
-        lines[i].SetLineColor(kBlack);
-        lines[i].Draw("SAME");
-    }
-
-    c1->Write();
-    delete c1;
-}
-
-
-/**
  * @brief Reads information from text file with simulation info into.
  * 
  * @param tracking_hist_repo folder containing root file with histograms to analyse
  * @param info_file File with analysis info this will read
  * @param first_line First line to read info from
  * @param last_line Last line to read info from
+ * @param verbose
  * @return std::vector<std::string> {traking_files, abs_scalings, abs1_idx}
  */
-std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file, unsigned int first_line, unsigned int last_line, bool verbose) {
+std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file, const unsigned int first_line, const unsigned int last_line, const bool verbose) {
 
     std::ifstream file(info_file);
     std::string str;
