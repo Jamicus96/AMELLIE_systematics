@@ -18,6 +18,35 @@ rectangle::rectangle(double X_max, double X_min, double T_max, double T_min) {
     x_max = X_max; x_min = X_min; t_max = T_max; t_min = T_min;
 }
 
+unsigned int Xbin_max(const rectangle& rect, const double Xbin_size, const double Xbin_max, const double Xbin_min) {
+    if (rect.X_max() >= Xbin_max) {
+        return (unsigned int) ((Xbin_max - Xbin_min) / Xbin_size);
+    } else {
+        return (unsigned int) ((rect.X_max() - Xbin_min) / Xbin_size);
+    }
+}
+unsigned int Xbin_min(const rectangle& rect, const double Xbin_size, const double Xbin_max, const double Xbin_min) {
+    if (rect.X_min() <= Xbin_min) {
+        return 1;
+    } else {
+        return (unsigned int) ((rect.X_max() - Xbin_min) / Xbin_size);
+    }
+}
+unsigned int Tbin_max(const rectangle& rect, const double Tbin_size, const double Tbin_max, const double Tbin_min) {
+    if (rect.T_max() >= Tbin_max) {
+        return (unsigned int) ((Tbin_max - Tbin_min) / Tbin_size);
+    } else {
+        return (unsigned int) ((rect.T_max() - Tbin_min) / Tbin_size);
+    }
+}
+unsigned int Tbin_min(const rectangle& rect, const double Tbin_size, const double Tbin_max, const double Tbin_min) {
+    if (rect.T_min() <= Tbin_min) {
+        return 1;
+    } else {
+        return (unsigned int) ((rect.T_max() - Tbin_min) / Tbin_size);
+    }
+}
+
 /**
  * @brief Checks if provided point is inside the rectangular region.
  * 

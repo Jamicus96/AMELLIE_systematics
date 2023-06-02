@@ -40,6 +40,11 @@ class rectangle {
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
+unsigned int Xbin_max(const rectangle& rect, const double Xbin_size, const double Xbin_max, const double Xbin_min);
+unsigned int Xbin_min(const rectangle& rect, const double Xbin_size, const double Xbin_max, const double Xbin_min);
+unsigned int Tbin_max(const rectangle& rect, const double Tbin_size, const double Tbin_max, const double Tbin_min);
+unsigned int Tbin_min(const rectangle& rect, const double Tbin_size, const double Tbin_max, const double Tbin_min);
+
 
 TH2F* GetHist(std::string root_filename, std::string hist_name = "hPmtResTimeVsCosTheta");
 
