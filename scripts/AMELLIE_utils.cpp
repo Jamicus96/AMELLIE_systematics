@@ -2,67 +2,79 @@
 
 
 
+rectangle::rectangle(TH2F* hist) {
+    // Set histogram binning info
+    hist_x_min = hist->GetXaxis()->GetXmin();
+    hist_x_max = hist->GetXaxis()->GetXmax();
+    hist_t_min = hist->GetYaxis()->GetXmin();
+    hist_t_max = hist->GetYaxis()->GetXmax();
+    hist_x_bin_size = (hist_x_max - hist_x_min) / (double)(hist->GetNbinsX());
+    hist_t_bin_size = (hist_t_max - hist_t_min) / (double)(hist->GetNbinsY());
+
+    // Set default rectangle bin coordinates (max histogram coordinates)
+    x_min_bin = 1;
+    x_max_bin = round(0.5 + ((hist_x_max - hist_x_min) / hist_x_bin_size));
+    t_min_bin = 1;
+    t_max_bin = round(0.5 + ((hist_t_max - hist_t_min) / hist_t_bin_size));
+}
+
 /**
  * @brief Construct a new rectangle::rectangle object.
  * 
- * @param X_max 
- * @param X_min 
- * @param T_max 
- * @param T_min 
+ * @param x_max 
+ * @param x_min 
+ * @param t_max 
+ * @param t_min 
  */
-rectangle::rectangle(double X_max, double X_min, double T_max, double T_min) {
-    if (X_max < X_min or T_max < T_min) {
+rectangle::rectangle(TH2F* hist, double x_max, double x_min, double t_max, double t_min) {
+    if (x_max < x_min or t_max < t_min) {
         std::cout << "Wrong limits: max less than min." << std::endl;
         exit(1);
     }
-    x_max = X_max; x_min = X_min; t_max = T_max; t_min = T_min;
+
+    // Set histogram binning info
+    hist_x_min = hist->GetXaxis()->GetXmin();
+    hist_x_max = hist->GetXaxis()->GetXmax();
+    hist_t_min = hist->GetYaxis()->GetXmin();
+    hist_t_max = hist->GetYaxis()->GetXmax();
+    hist_x_bin_size = (hist_x_max - hist_x_min) / (double)(hist->GetNbinsX());
+    hist_t_bin_size = (hist_t_max - hist_t_min) / (double)(hist->GetNbinsY());
+
+    // Set rectangle bin coordinates
+    this->Set_x_min(x_min);
+    this->Set_x_max(x_max);
+    this->Set_t_min(t_min);
+    this->Set_t_max(t_max);
 }
 
-unsigned int Xbin_max(const rectangle& rect, const double Xbin_size, const double Xbin_max, const double Xbin_min) {
-    if (rect.X_max() >= Xbin_max) {
-        return (unsigned int) ((Xbin_max - Xbin_min) / Xbin_size);
+void rectangle::Set_x_max(const double& x_max) {
+    if (hist_x_max <= x_max) {
+        x_max_bin = round(0.5 + ((hist_x_max - hist_x_min) / hist_x_bin_size));
     } else {
-        return (unsigned int) ((rect.X_max() - Xbin_min) / Xbin_size);
+        x_max_bin = round(0.5 + ((x_max - hist_x_min) / hist_x_bin_size));
     }
 }
-unsigned int Xbin_min(const rectangle& rect, const double Xbin_size, const double Xbin_max, const double Xbin_min) {
-    if (rect.X_min() <= Xbin_min) {
-        return 1;
+void rectangle::Set_x_min(const double& x_min) {
+    if (hist_x_min <= x_min) {
+        x_min_bin = 1;
     } else {
-        return (unsigned int) ((rect.X_min() - Xbin_min) / Xbin_size);
+        x_min_bin = round(0.5 + ((x_min - hist_x_min) / hist_x_bin_size));
     }
 }
-unsigned int Tbin_max(const rectangle& rect, const double Tbin_size, const double Tbin_max, const double Tbin_min) {
-    if (rect.T_max() >= Tbin_max) {
-        return (unsigned int) ((Tbin_max - Tbin_min) / Tbin_size);
+void rectangle::Set_t_max(const double& t_max) {
+    if (hist_t_max <= t_max) {
+        t_max_bin = round(0.5 + ((hist_t_max - hist_t_min) / hist_t_bin_size));
     } else {
-        return (unsigned int) ((rect.T_max() - Tbin_min) / Tbin_size);
+        t_max_bin = round(0.5 + ((t_max - hist_t_min) / hist_t_bin_size));
     }
 }
-unsigned int Tbin_min(const rectangle& rect, const double Tbin_size, const double Tbin_max, const double Tbin_min) {
-    if (rect.T_min() <= Tbin_min) {
-        return 1;
+void rectangle::Set_t_min(const double& t_min) {
+    if (hist_t_min <= t_min) {
+        t_min_bin = 1;
     } else {
-        return (unsigned int) ((rect.T_min() - Tbin_min) / Tbin_size);
+        t_min_bin = round(0.5 + ((t_min - hist_t_min) / hist_t_bin_size));
     }
 }
-
-/**
- * @brief Checks if provided point is inside the rectangular region.
- * 
- * @param point_x 
- * @param point_t 
- * @return true 
- * @return false 
- */
-bool rectangle::check_point_inside_rectangle(const double point_x, const double point_t) const {
-    if (point_x > x_max or point_x < x_min or point_t > t_max or point_t < t_min) {
-        return false;
-    } else {
-        return true;
-    }
-}
-
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 

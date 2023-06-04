@@ -13,9 +13,9 @@
 
 
 std::vector<double> create_lims(const double min, const double max, const unsigned int N);
-double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<TH2F*>& hists, const std::vector<double>& abs_scalings, const std::vector<double>& bin_info, const int abs1_idx, const bool verbose);
-std::vector<double> getRatio(const rectangle& direct_region, const rectangle& reflected_region, TH2F* allPathsHist, const std::vector<double>& bin_info, const bool verbose);
-std::vector<std::vector<std::string> > readInfoFile(std::string tracking_hist_repo, std::string info_file, const unsigned int first_line, const unsigned int last_line, const bool verbose);
+double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<TH2F*>& hists, const std::vector<double>& abs_scalings, const int abs1_idx, const bool verbose);
+std::vector<double> getRatio(const rectangle& direct_region, const rectangle& reflected_region, TH2F* allPathsHist, const bool verbose);
+std::vector<std::vector<std::string>> readInfoFile(std::string tracking_hist_repo, std::string info_file, const unsigned int first_line, const unsigned int last_line, const bool verbose);
 
 
 
@@ -27,11 +27,10 @@ int main(int argc, char** argv) {
     std::string tracking_hist_repo = argv[4];
     // Read in output filename (txt)
     std::string output_file = argv[5];
-    // record extra info?
     bool verbose = std::stoi(argv[6]);
 
     // Create list of tracking hist file names from info file, and list abs_scalings
-    std::vector<std::vector<std::string> > file_info = readInfoFile(tracking_hist_repo, info_file, first_line, last_line, verbose);
+    std::vector<std::vector<std::string>> file_info = readInfoFile(tracking_hist_repo, info_file, first_line, last_line, verbose);
 
     // Unpack info
     unsigned int abs1_idx = std::stoi(file_info.at(2).at(0));
@@ -59,45 +58,33 @@ int main(int argc, char** argv) {
     std::vector<double> ref_t_wid_lims = create_lims(ref_t_wid_min, ref_t_wid_max, N);
 
     // Set up regions
-    rectangle direct_region = rectangle(dir_x_max_lims.at(0), -1.0, dir_t_cen_lims.at(0) + 0.5 * dir_t_wid_lims.at(0), dir_t_cen_lims.at(0) - 0.5 * dir_t_wid_lims.at(0));
-    rectangle reflected_region = rectangle(1.0, ref_x_min_lims.at(0), ref_t_cen_lims.at(0) + 0.5 * ref_t_wid_lims.at(0), ref_t_cen_lims.at(0) - 0.5 * ref_t_wid_lims.at(0));
-
-    // Get hist binning info (Assuming they are all the same, which they should be)
-    double X_min = hists.at(0)->GetXaxis()->GetXmin();
-    double X_max = hists.at(0)->GetXaxis()->GetXmax();
-    double T_min = hists.at(0)->GetYaxis()->GetXmin();
-    double T_max = hists.at(0)->GetYaxis()->GetXmax();
-
-    double Xbin_size = (X_max - X_min) / (double)(hists.at(0)->GetNbinsX());
-    double Tbin_size = (T_max - T_min) / (double)(hists.at(0)->GetNbinsY());
-    std::vector<double> bin_info = {X_min, X_max, Xbin_size, T_min, T_max, Tbin_size}; // Package up to pass to functions
-    if (verbose) {
-        std::cout << "Histograms: X_min = " << X_min << ", X_max = " << X_max << ", Xbin_size = " << Xbin_size
-                            << ", T_min = " << T_min << ", T_max = " << T_max << ", Tbin_size = " << Tbin_size << std::endl;
-    }
+    rectangle direct_region = rectangle(hists.at(0));
+    direct_region.Set_x_min(-1.0);  // harcoded at histgram left edge
+    rectangle reflected_region = rectangle(hists.at(0));
+    direct_region.Set_x_max(1.0);  // harcoded at histgram right edge
 
     // Loop through all region lims, and compute FOM, and print them to file
     std::ofstream datafile;
     datafile.open(output_file.c_str(), std::ios::trunc);
     double slope;
     for (unsigned int i = 0; i < N; ++i) {
-        direct_region.X_max() = dir_x_max_lims.at(i);
+        direct_region.Set_x_max(dir_x_max_lims.at(i));
         for (unsigned int j = 0; j < N; ++j) {
             for (unsigned int k = 0; k < N; ++k) {
-                direct_region.T_max() = dir_t_cen_lims.at(j) + 0.5 * dir_t_wid_lims.at(k);
-                direct_region.T_min() = dir_t_cen_lims.at(j) - 0.5 * dir_t_wid_lims.at(k);
-                if (verbose) std::cout << "direct region: x € [" << direct_region.X_min() << ", " << direct_region.X_max() << "], t € [" << direct_region.T_min() << ", " << direct_region.T_max() << "]" << std::endl;
+                direct_region.Set_t_max(dir_t_cen_lims.at(j) + 0.5 * dir_t_wid_lims.at(k));
+                direct_region.Set_t_min(dir_t_cen_lims.at(j) - 0.5 * dir_t_wid_lims.at(k));
+                if (verbose) std::cout << "direct region: x bins € [" << direct_region.X_min_bin() << ", " << direct_region.X_max_bin() << "], t bins € [" << direct_region.T_min_bin() << ", " << direct_region.T_max_bin() << "]" << std::endl;
 
                 for (unsigned int l = 0; l < N; ++l) {
-                    reflected_region.X_min() = ref_x_min_lims.at(l);
+                    reflected_region.Set_x_min(ref_x_min_lims.at(l));
                     for (unsigned int m = 0; m < N; ++m) {
                         for (unsigned int n = 0; n < N; ++n) {
-                            reflected_region.T_max() = ref_t_cen_lims.at(m) + 0.5 * ref_t_wid_lims.at(n);
-                            reflected_region.T_min() = ref_t_cen_lims.at(m) - 0.5 * ref_t_wid_lims.at(n);
-                            if (verbose) std::cout << "reflected region: x € [" << reflected_region.X_min() << ", " << reflected_region.X_max() << "], t € [" << reflected_region.T_min() << ", " << reflected_region.T_max() << "]" << std::endl;
+                            reflected_region.Set_t_max(ref_t_cen_lims.at(m) + 0.5 * ref_t_wid_lims.at(n));
+                            reflected_region.Set_t_min(ref_t_cen_lims.at(m) - 0.5 * ref_t_wid_lims.at(n));
+                            if (verbose) std::cout << "reflected region: x bins € [" << reflected_region.X_min_bin() << ", " << reflected_region.X_max_bin() << "], t bins € [" << reflected_region.T_min_bin() << ", " << reflected_region.T_max_bin() << "]" << std::endl;
 
                             // Compute slope
-                            slope = GetFOMabsSlope(direct_region, reflected_region, hists, abs_scalings, bin_info, abs1_idx, verbose);
+                            slope = GetFOMabsSlope(direct_region, reflected_region, hists, abs_scalings, abs1_idx, verbose);
                             if (verbose) std::cout << "Slope = " << slope << std::endl;
 
                             // print region limits first, and then slope. All space-separated
@@ -148,14 +135,14 @@ std::vector<double> create_lims(const double min, const double max, const unsign
  * @param abs1_idx 
  * @return double 
  */
-double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<TH2F*>& hists, const std::vector<double>& abs_scalings, const std::vector<double>& bin_info, const int abs1_idx, const bool verbose) {
+double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<TH2F*>& hists, const std::vector<double>& abs_scalings, const int abs1_idx, const bool verbose) {
 
     // Get ratio of hits in both triangular regions, and associated error, then normalise all to the ratio
     // found at abs = 1. Then compute best fit slope of normalised ratio vs abs:
 
     // abs = 1 ratio
     if (verbose) std::cout << "Getting ratio for idx = " << abs1_idx << " (abs = 1)" << std::endl;
-    std::vector<double> ratio_abs1 = getRatio(direct_region, reflected_region, hists.at(abs1_idx), bin_info, verbose);
+    std::vector<double> ratio_abs1 = getRatio(direct_region, reflected_region, hists.at(abs1_idx), verbose);
 
     double ratio;
     double ratio_err;
@@ -167,7 +154,7 @@ double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected
 
         // ratio for other abs
         if (verbose) std::cout << "Getting ratio for idx = " << n << std::endl;
-        ratio_res = getRatio(direct_region, reflected_region, hists.at(n), bin_info, verbose);
+        ratio_res = getRatio(direct_region, reflected_region, hists.at(n), verbose);
         ratio = ratio_res.at(0) / ratio_abs1.at(0); // normalise ratio to value at abs=1.0
         ratio_err = sqrt(((ratio_res.at(1)*ratio_res.at(1)) / (ratio_abs1.at(0)*ratio_abs1.at(0)))
                         + ((ratio_res.at(0)*ratio_res.at(0) * ratio_abs1.at(1)*ratio_abs1.at(1))
@@ -191,7 +178,7 @@ double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected
  * @param bin_info = {X_min, X_max, Xbin_size, T_min, T_max, Tbin_size} Histogram binning info
  * @return std::vector<double> 
  */
-std::vector<double> getRatio(const rectangle& direct_region, const rectangle& reflected_region, TH2F* hist, const std::vector<double>& bin_info, const bool verbose) {
+std::vector<double> getRatio(const rectangle& direct_region, const rectangle& reflected_region, TH2F* hist, const bool verbose) {
 
     // Count number of hits in direct and reflected regions
     double direct_count = 0.0;
@@ -199,27 +186,17 @@ std::vector<double> getRatio(const rectangle& direct_region, const rectangle& re
     double xBinCenter;
 
     // Loop over bins in direct region
-    unsigned int x_min = Xbin_min(direct_region, bin_info.at(2), bin_info.at(1), bin_info.at(0));
-    unsigned int x_max = Xbin_max(direct_region, bin_info.at(2), bin_info.at(1), bin_info.at(0));
-    unsigned int t_min = Tbin_min(direct_region, bin_info.at(5), bin_info.at(4), bin_info.at(3));
-    unsigned int t_max = Tbin_max(direct_region, bin_info.at(5), bin_info.at(4), bin_info.at(3));
-    if (verbose) std::cout << "direct region bins: x_min = " << x_min << ", x_max = " << x_max << ", t_min = " << t_min << ", t_max = " << t_max << std::endl;
-    for (unsigned int x = x_min; x < x_max; ++x) {  // loop over histogram bins
+    for (unsigned int x = direct_region.X_min_bin(); x <= direct_region.X_max_bin(); ++x) {  // loop over histogram bins
         xBinCenter = hist->GetXaxis()->GetBinCenter(x);
-        for (unsigned int t = t_min; t < t_max; ++t) {
+        for (unsigned int t = direct_region.T_min_bin(); t < direct_region.T_max_bin(); ++t) {
             direct_count += hist->GetBinContent(x, hist->GetYaxis()->GetBinCenter(t));
         }
     }
 
     // Loop over bins in reflected region
-    x_min = Xbin_min(reflected_region, bin_info.at(2), bin_info.at(1), bin_info.at(0));
-    x_max = Xbin_max(reflected_region, bin_info.at(2), bin_info.at(1), bin_info.at(0));
-    t_min = Tbin_min(reflected_region, bin_info.at(5), bin_info.at(4), bin_info.at(3));
-    t_max = Tbin_max(reflected_region, bin_info.at(5), bin_info.at(4), bin_info.at(3));
-    if (verbose) std::cout << "reflected region bins: x_min = " << x_min << ", x_max = " << x_max << ", t_min = " << t_min << ", t_max = " << t_max << std::endl;
-    for (unsigned int x = x_min; x < x_max; ++x) {  // loop over histogram bins
+    for (unsigned int x = reflected_region.X_min_bin(); x <= reflected_region.X_max_bin(); ++x) {  // loop over histogram bins
         xBinCenter = hist->GetXaxis()->GetBinCenter(x);
-        for (unsigned int t = t_min; t < t_max; ++t) {
+        for (unsigned int t = reflected_region.T_min_bin(); t < reflected_region.T_max_bin(); ++t) {
             reflected_count += hist->GetBinContent(x, hist->GetYaxis()->GetBinCenter(t));
         }
     }
