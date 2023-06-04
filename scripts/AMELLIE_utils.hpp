@@ -11,6 +11,8 @@
 
 /**
  * @brief Class to encode the direct and reflected regions
+ * IDEA: make the coords in bin number + save hist binning info so that it can take normal coords
+ * as arguments and compute bin coords. That way bin coords are only computed once for all hists.
  * 
  */
 class rectangle {

@@ -146,15 +146,15 @@ void DrawRegionLims(const rectangle& direct_region, const rectangle& reflected_r
         // create lines
         std::vector<TLine> lines;
         // direct box
-        lines.push_back(TLine(direct_region.X_min(), direct_region.Y_min(), direct_region.X_min(), direct_region.Y_max()));
-        lines.push_back(TLine(direct_region.X_max(), direct_region.Y_min(), direct_region.X_max(), direct_region.Y_max()));
-        lines.push_back(TLine(direct_region.X_min(), direct_region.Y_min(), direct_region.X_max(), direct_region.Y_min()));
-        lines.push_back(TLine(direct_region.X_min(), direct_region.Y_max(), direct_region.X_max(), direct_region.Y_max()));
+        lines.push_back(TLine(direct_region.X_min(), direct_region.T_min(), direct_region.X_min(), direct_region.T_max()));
+        lines.push_back(TLine(direct_region.X_max(), direct_region.T_min(), direct_region.X_max(), direct_region.T_max()));
+        lines.push_back(TLine(direct_region.X_min(), direct_region.T_min(), direct_region.X_max(), direct_region.T_min()));
+        lines.push_back(TLine(direct_region.X_min(), direct_region.T_max(), direct_region.X_max(), direct_region.T_max()));
         // reflected box
-        lines.push_back(TLine(reflected_region.X_min(), reflected_region.Y_min(), reflected_region.X_min(), reflected_region.Y_max()));
-        lines.push_back(TLine(reflected_region.X_max(), reflected_region.Y_min(), reflected_region.X_max(), reflected_region.Y_max()));
-        lines.push_back(TLine(reflected_region.X_min(), reflected_region.Y_min(), reflected_region.X_max(), reflected_region.Y_min()));
-        lines.push_back(TLine(reflected_region.X_min(), reflected_region.Y_max(), reflected_region.X_max(), reflected_region.Y_max()));
+        lines.push_back(TLine(reflected_region.X_min(), reflected_region.T_min(), reflected_region.X_min(), reflected_region.T_max()));
+        lines.push_back(TLine(reflected_region.X_max(), reflected_region.T_min(), reflected_region.X_max(), reflected_region.T_max()));
+        lines.push_back(TLine(reflected_region.X_min(), reflected_region.T_min(), reflected_region.X_max(), reflected_region.T_min()));
+        lines.push_back(TLine(reflected_region.X_min(), reflected_region.T_max(), reflected_region.X_max(), reflected_region.T_max()));
 
         // draw lines
         for(unsigned int i = 0; i < lines.size(); ++i){

@@ -29,7 +29,7 @@ unsigned int Xbin_min(const rectangle& rect, const double Xbin_size, const doubl
     if (rect.X_min() <= Xbin_min) {
         return 1;
     } else {
-        return (unsigned int) ((rect.X_max() - Xbin_min) / Xbin_size);
+        return (unsigned int) ((rect.X_min() - Xbin_min) / Xbin_size);
     }
 }
 unsigned int Tbin_max(const rectangle& rect, const double Tbin_size, const double Tbin_max, const double Tbin_min) {
@@ -43,7 +43,7 @@ unsigned int Tbin_min(const rectangle& rect, const double Tbin_size, const doubl
     if (rect.T_min() <= Tbin_min) {
         return 1;
     } else {
-        return (unsigned int) ((rect.T_max() - Tbin_min) / Tbin_size);
+        return (unsigned int) ((rect.T_min() - Tbin_min) / Tbin_size);
     }
 }
 

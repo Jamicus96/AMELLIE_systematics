@@ -9,7 +9,7 @@ GetHists.exe: GetHists.cpp
 	g++ -g -std=c++11 GetHists.cpp -o GetHists.exe ${RAT_CONFIG}
 
 GetFOMabsSlopes.exe: GetFOMabsSlopes.cpp
-	g++ -g -std=c++11 GetFOMabsSlopes.cpp -o GetFOMabsSlopes.exe ${RAT_CONFIG}
+	g++ -g -std=c++11 GetFOMabsSlopes.cpp AMELLIE_utils.hpp  AMELLIE_utils.cpp -o GetFOMabsSlopes.exe ${RAT_CONFIG}
 	
 clean :
 	rm *.exe
