@@ -42,12 +42,14 @@ int main(int argc, char** argv) {
     }
 
     // Create reagion lims to iterate over (6 values):
-    double dir_x_max_min = -0.95; double dir_x_max_max = -0.7;
-    double ref_x_min_min = 0.7; double ref_x_min_max = 0.95;
-    double dir_t_cen_min = -10.0; double dir_t_cen_max = 10.0;
-    double ref_t_cen_min = -10.0; double ref_t_cen_max = 10.0;
-    double dir_t_wid_min = 5.0; double dir_t_wid_max = 30.0;
-    double ref_t_wid_min = 5.0; double ref_t_wid_max = 30.0;
+    // (recall bin sizes are 0.002x and 0.3t)
+    // (also recall errors are roughly 1.5deg ~ 0.001x and 1.7t)
+    double dir_x_max_min = -0.95; double dir_x_max_max = -0.8;
+    double ref_x_min_min = 0.8; double ref_x_min_max = 0.95;
+    double dir_t_cen_min = -7.0; double dir_t_cen_max = 15.0;
+    double ref_t_cen_min = -7.0; double ref_t_cen_max = 15.0;
+    double dir_t_wid_min = 3.0; double dir_t_wid_max = 20.0;
+    double ref_t_wid_min = 3.0; double ref_t_wid_max = 20.0;
 
     unsigned int N = 10;
     std::vector<double> dir_x_max_lims = create_lims(dir_x_max_min, dir_x_max_max, N);
@@ -116,7 +118,7 @@ std::vector<double> create_lims(const double min, const double max, const unsign
     const double step = (max - min) / (double)(N - 1);
 
     std::vector<double> lims = {min};
-    for (unsigned int n = 0; n < N; ++n) {
+    for (unsigned int n = 1; n < N; ++n) {
         lims.push_back(min + n * step);
     }
 
@@ -141,7 +143,7 @@ double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected
     // found at abs = 1. Then compute best fit slope of normalised ratio vs abs:
 
     // abs = 1 ratio
-    if (verbose) std::cout << "Getting ratio for idx = " << abs1_idx << " (abs = 1)" << std::endl;
+    // if (verbose) std::cout << "Getting ratio for idx = " << abs1_idx << " (abs = 1)" << std::endl;
     std::vector<double> ratio_abs1 = getRatio(direct_region, reflected_region, hists.at(abs1_idx), verbose);
 
     double ratio;
@@ -153,7 +155,7 @@ double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected
         if (n == abs1_idx) continue;  // values are just zero
 
         // ratio for other abs
-        if (verbose) std::cout << "Getting ratio for idx = " << n << std::endl;
+        // if (verbose) std::cout << "Getting ratio for idx = " << n << std::endl;
         ratio_res = getRatio(direct_region, reflected_region, hists.at(n), verbose);
         ratio = ratio_res.at(0) / ratio_abs1.at(0); // normalise ratio to value at abs=1.0
         ratio_err = sqrt(((ratio_res.at(1)*ratio_res.at(1)) / (ratio_abs1.at(0)*ratio_abs1.at(0)))
