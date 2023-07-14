@@ -13,45 +13,54 @@
 
 
 std::vector<double> create_lims(const double min, const double max, const unsigned int N);
-double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<TH2F*>& hists, const std::vector<double>& abs_scalings, const int abs1_idx, const bool verbose);
-std::vector<double> getRatio(const rectangle& direct_region, const rectangle& reflected_region, TH2F* allPathsHist, const bool verbose);
-std::vector<std::vector<std::string>> readInfoFile(std::string tracking_hist_repo, std::string info_file, const unsigned int first_line, const unsigned int last_line, const bool verbose);
+void GetFOMabsSlope(std::vector<double>& slope_info, const rectangle& direct_region, const rectangle& reflected_region, const std::vector<TH2F*>& hists, const std::vector<double>& abs_scalings_min1, const bool verbose);
+void getRatio(std::vector<double>& ratio_res, const rectangle& direct_region, const rectangle& reflected_region, TH2F* allPathsHist, const bool verbose);
+// std::vector<std::vector<std::string>> readInfoFile(std::string tracking_hist_repo, std::string info_file, const unsigned int first_line, const unsigned int last_line, const bool verbose);
 
 
 
 int main(int argc, char** argv) {
     // Read in text file with list of stats that were simulated (different abs, the rest the same for now)
-    std::string info_file = argv[1];
-    unsigned int first_line = std::stoi(argv[2]);
-    unsigned int last_line = std::stoi(argv[3]);
-    std::string tracking_hist_repo = argv[4];
-    // Read in output filename (txt)
-    std::string output_file = argv[5];
-    bool verbose = std::stoi(argv[6]);
+    std::string tracking_hist_repo = argv[1];
+    std::string output_file = argv[2];
+    bool verbose = std::stoi(argv[3]);
 
-    // Create list of tracking hist file names from info file, and list abs_scalings
-    std::vector<std::vector<std::string>> file_info = readInfoFile(tracking_hist_repo, info_file, first_line, last_line, verbose);
+    // Read in region limit ranges
+    double dir_x_max_min = std::stod(argv[4]);
+    double dir_x_max_max = std::stod(argv[5]);
+    double ref_x_min_min = std::stod(argv[6]);
+    double ref_x_min_max = std::stod(argv[7]);
+    double dir_t_cen_min = std::stod(argv[8]);
+    double dir_t_cen_max = std::stod(argv[9]);
+    double ref_t_cen_min = std::stod(argv[10]);
+    double ref_t_cen_max = std::stod(argv[11]);
+    double dir_t_wid_min = std::stod(argv[12]);
+    double dir_t_wid_max = std::stod(argv[13]);
+    double ref_t_wid_min = std::stod(argv[14]);
+    double ref_t_wid_max = std::stod(argv[15]);
+    unsigned int N = std::stoi(argv[16]);
+
+    // Read in hist files and corresponsing abs
+    std::vector<double> abs_scalings_min1;
+    std::vector<std::string> traking_files;
+    bool write_abs = true;
+    for (unsigned int i = 17; i < argc; ++i) {
+        if (write_abs) {
+            abs_scalings_min1.push_back(std::stod(argv[i]) - 1.0);
+            write_abs = false;
+        } else {
+            traking_files.push_back(argv[i]);
+            write_abs = true;
+        }
+    }
 
     // Unpack info
-    unsigned int abs1_idx = std::stoi(file_info.at(2).at(0));
-    std::vector<double> abs_scalings;
     std::vector<TH2F*> hists;
-    for (unsigned int i = 0; i < file_info.at(0).size(); ++i) {
-        abs_scalings.push_back(std::stod(file_info.at(1).at(i)));
-        hists.push_back(GetHist(file_info.at(0).at(i), "hPmtResTimeVsCosTheta"));
+    for (unsigned int i = 0; i < traking_files.size(); ++i) {
+        hists.push_back(GetHist(traking_files.at(i), "hPmtResTimeVsCosTheta"));
     }
 
     // Create reagion lims to iterate over (6 values):
-    // (recall bin sizes are 0.002x and 0.3t)
-    // (also recall errors are roughly 1.5deg ~ 0.001x and 1.7t)
-    double dir_x_max_min = -0.95; double dir_x_max_max = -0.8;
-    double ref_x_min_min = 0.8; double ref_x_min_max = 0.95;
-    double dir_t_cen_min = -7.0; double dir_t_cen_max = 15.0;
-    double ref_t_cen_min = -7.0; double ref_t_cen_max = 15.0;
-    double dir_t_wid_min = 3.0; double dir_t_wid_max = 20.0;
-    double ref_t_wid_min = 3.0; double ref_t_wid_max = 20.0;
-
-    unsigned int N = 10;
     std::vector<double> dir_x_max_lims = create_lims(dir_x_max_min, dir_x_max_max, N);
     std::vector<double> ref_x_min_lims = create_lims(ref_x_min_min, ref_x_min_max, N);
     std::vector<double> dir_t_cen_lims = create_lims(dir_t_cen_min, dir_t_cen_max, N);
@@ -68,7 +77,7 @@ int main(int argc, char** argv) {
     // Loop through all region lims, and compute FOM, and print them to file
     std::ofstream datafile;
     datafile.open(output_file.c_str(), std::ios::trunc);
-    double slope;
+    std::vector<double> slope_info = {0.0, 0.0};
     for (unsigned int i = 0; i < N; ++i) {
         direct_region.Set_x_max(dir_x_max_lims.at(i));
         for (unsigned int j = 0; j < N; ++j) {
@@ -86,12 +95,12 @@ int main(int argc, char** argv) {
                             if (verbose) std::cout << "reflected region: x bins € [" << reflected_region.X_min_bin() << ", " << reflected_region.X_max_bin() << "], t bins € [" << reflected_region.T_min_bin() << ", " << reflected_region.T_max_bin() << "]" << std::endl;
 
                             // Compute slope
-                            slope = GetFOMabsSlope(direct_region, reflected_region, hists, abs_scalings, abs1_idx, verbose);
-                            if (verbose) std::cout << "Slope = " << slope << std::endl;
+                            GetFOMabsSlope(slope_info, direct_region, reflected_region, hists, abs_scalings_min1, verbose);
+                            if (verbose) std::cout << "Slope = " << slope_info.at(0) << std::endl;
 
                             // print region limits first, and then slope. All space-separated
                             datafile << dir_x_max_lims.at(i) << " " << dir_t_cen_lims.at(j) << " " << dir_t_wid_lims.at(k) << " " << ref_x_min_lims.at(l)
-                                     << " " << ref_t_cen_lims.at(m) << " " << ref_t_wid_lims.at(n) << " " << slope << std::endl;
+                                     << " " << ref_t_cen_lims.at(m) << " " << ref_t_wid_lims.at(n) << " " << slope_info.at(0) << " " << slope_info.at(1) << std::endl;
                         }
                     }
                 }
@@ -127,60 +136,64 @@ std::vector<double> create_lims(const double min, const double max, const unsign
 
 
 /**
- * @brief Returns FOM/abs slope (called y)
+ * @brief Returns FOM/abs slope (called y), and reduced Chi squared
  * 
+ * @param slope_info = {fit slope (FOM), reduced Chi squared}, what gets modified to return value
  * @param direct_region 
  * @param reflected_region 
  * @param hists 
- * @param abs_scalings 
+ * @param abs_scalings_min1 
  * @param bin_info 
- * @param abs1_idx 
- * @return double 
+ * @return std::vector<double> 
  */
-double GetFOMabsSlope(const rectangle& direct_region, const rectangle& reflected_region, const std::vector<TH2F*>& hists, const std::vector<double>& abs_scalings, const int abs1_idx, const bool verbose) {
+void GetFOMabsSlope(std::vector<double>& slope_info, const rectangle& direct_region, const rectangle& reflected_region, const std::vector<TH2F*>& hists, const std::vector<double>& abs_scalings_min1, const bool verbose) {
 
     // Get ratio of hits in both triangular regions, and associated error, then normalise all to the ratio
     // found at abs = 1. Then compute best fit slope of normalised ratio vs abs:
 
     // abs = 1 ratio
-    // if (verbose) std::cout << "Getting ratio for idx = " << abs1_idx << " (abs = 1)" << std::endl;
-    std::vector<double> ratio_abs1 = getRatio(direct_region, reflected_region, hists.at(abs1_idx), verbose);
+    // if (verbose) std::cout << "Getting ratio for idx = " << 0 << " (abs = 1)" << std::endl;
+    std::vector<double> ratio_abs1 = {0.0, 0.0};
+    getRatio(ratio_abs1, direct_region, reflected_region, hists.at(0), verbose);
 
-    double ratio;
-    double ratio_err;
-    double S_xy;
-    double S_xx;
+    double ratio_min1;
+    double ratio_err2;
+    double S_xy = 0.0;
+    double S_xx = 0.0;
+    double S_yy = 0.0;
     std::vector<double> ratio_res = {0.0, 0.0};
-    for (unsigned int n = 0; n < abs_scalings.size(); ++n) {
-        if (n == abs1_idx) continue;  // values are just zero
-
+    for (unsigned int n = 1; n < abs_scalings_min1.size(); ++n) {
         // ratio for other abs
         // if (verbose) std::cout << "Getting ratio for idx = " << n << std::endl;
-        ratio_res = getRatio(direct_region, reflected_region, hists.at(n), verbose);
-        ratio = ratio_res.at(0) / ratio_abs1.at(0); // normalise ratio to value at abs=1.0
-        ratio_err = sqrt(((ratio_res.at(1)*ratio_res.at(1)) / (ratio_abs1.at(0)*ratio_abs1.at(0)))
-                        + ((ratio_res.at(0)*ratio_res.at(0) * ratio_abs1.at(1)*ratio_abs1.at(1))
-                        / (ratio_abs1.at(0)*ratio_abs1.at(0)*ratio_abs1.at(0)*ratio_abs1.at(0)))); // update errors accordingly
+        getRatio(ratio_res, direct_region, reflected_region, hists.at(n), verbose);
+        ratio_min1 = (ratio_res.at(0) / ratio_abs1.at(0)) - 1.0; // normalise ratio to value at abs=1.0, then subtract 1
+        ratio_err2 = (ratio_res.at(1)*ratio_res.at(1)+ (ratio_res.at(0)*ratio_res.at(0)
+                     / (ratio_abs1.at(0)*ratio_abs1.at(0))) * ratio_abs1.at(1)*ratio_abs1.at(1))
+                     / (ratio_abs1.at(0)*ratio_abs1.at(0)); // update errors (squared) accordingly
 
         // Add to quantities used to find slope (FOM) of ratio vs abs
-        S_xy += ((abs_scalings.at(n) - 1.0) * (ratio - 1.0)) / (ratio_err*ratio_err);
-        S_xx += ((abs_scalings.at(n) - 1.0) * (abs_scalings.at(n) - 1.0)) / (ratio_err*ratio_err);
+        S_xy += (abs_scalings_min1.at(n) * ratio_min1) / ratio_err2;
+        S_xx += (abs_scalings_min1.at(n) * abs_scalings_min1.at(n)) / ratio_err2;
+        S_yy += (ratio_min1 * ratio_min1) / ratio_err2;
     }
 
-    return S_xy / S_xx;  // return best fit slope (FOM)
+    // Return results
+    slope_info.at(0) = S_xy / S_xx;  // fit slope (FOM)
+    slope_info.at(1) = (S_yy - (S_xy*S_xy / S_xx)) / ((double)abs_scalings_min1.size() - 1.0);  // reduced Chi squared
 }
 
 
 /**
  * @brief Get the Ratio [#hits in reflected region / #hits in direct region], along with the associated statistical error.
  * 
+ * @param ratio_res = {ratio, stats error}, what gets modified to return value
  * @param direct_region 
  * @param reflected_region 
  * @param hist 
  * @param bin_info = {X_min, X_max, Xbin_size, T_min, T_max, Tbin_size} Histogram binning info
  * @return std::vector<double> 
  */
-std::vector<double> getRatio(const rectangle& direct_region, const rectangle& reflected_region, TH2F* hist, const bool verbose) {
+void getRatio(std::vector<double>& ratio_res, const rectangle& direct_region, const rectangle& reflected_region, TH2F* hist, const bool verbose) {
 
     // Count number of hits in direct and reflected regions
     double direct_count = 0.0;
@@ -214,7 +227,8 @@ std::vector<double> getRatio(const rectangle& direct_region, const rectangle& re
     }
 
     // Compute ratio of both, and associated stat error (assuming stat errors for regions of sqrt(N))
-    return {reflected_count / direct_count, (sqrt(reflected_count) / direct_count) * sqrt(1.0 + (reflected_count / direct_count))};
+    ratio_res.at(0) = reflected_count / direct_count;
+    ratio_res.at(1) = (sqrt(reflected_count) / direct_count) * sqrt(1.0 + (reflected_count / direct_count));
 }
 
 

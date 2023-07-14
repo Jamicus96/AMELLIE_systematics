@@ -25,6 +25,8 @@ def argparser():
                         default='/mnt/lustre/scratch/epp/jp643/AMELLIE/2p2gL/MC/tot_hists/', help='Folder to save recombined root files with tracking information in.')
     parser.add_argument('--stats_repo', '-str', type=str, dest='stats_repo',
                         default='/mnt/lustre/scratch/epp/jp643/AMELLIE/2p2gL/MC/stats/', help='Folder to save stats txt files in.')
+    parser.add_argument('--slopes_repo', '-slr', type=str, dest='slopes_repo',
+                        default='/mnt/lustre/scratch/epp/jp643/AMELLIE/2p2gL/MC/slopes/', help='Folder to save slopes txt files in.')
     parser.add_argument('--json_repo', '-jsr', type=str, dest='json_repo',
                         default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/2p2gL/results/',
                         help='Folder to json file with final stats in.')
@@ -47,15 +49,19 @@ def argparser():
     parser.add_argument('--list', '-l', type=str, dest='list_file',
                         default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/2p2gL/list_info/list.txt', help='Text file with list of sim stats. Format per line:\n\
                             geo_file.geo, LED, fibre, reemis, abs')
+    parser.add_argument('--lim_list', '-ll', type=str, dest='lim_list_file',
+                        default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/2p2gL/list_info/lim_list.txt', help='Text file with limits of region cuts to compute slopes from. Format per line:\n\
+                            fibre, dir_x_max_min dir_x_max_max ref_x_min_min ref_x_min_max dir_t_cen_min dir_t_cen_max ref_t_cen_min ref_t_cen_max dir_t_wid_min dir_t_wid_max ref_t_wid_min ref_t_wid_max N\n\
+                            Where N is the number of values in each "direction" to iterate over (so N^6 computations)')
     parser.add_argument('--region_lims', '-r', type=str, dest='region_lims',
                         default='/mnt/lustre/projects/epp/general/neutrino/jp643/rat_dependent/AMELLIE/2p2gL/list_inf/lim_list.txt', help='Text file with list of region limits to apply. Format per line:\n\
                             direct_x_max, reflected_x_min, direct_y_centre, direct_dy, reflected_y_centre, reflected_dy')
     parser.add_argument('---step', '-s', type=str, dest='step',
-                    default='all', choices=['sim', 'hist', 'combi', 'stats', 'sim-hist', 'hist-combi',
+                    default='all', choices=['sim', 'hist', 'combi', 'stats', 'slopes', 'sim-hist', 'hist-combi',
                                             'combi-stats', 'hist-combi-stats',  'all'],
                     help='which step of the process is it in?')
     parser.add_argument('---verbose', '-v', type=bool, dest='verbose',
-                    default=True, help='print and save extra info')
+                    default=False, help='print and save extra info')
 
     args = parser.parse_args()
     return args
@@ -127,7 +133,13 @@ def job_str_map(jobName_str, info):
         },
         'fibre': {
             'FA108': 'A',
-            'FA093': 'B'
+            'FA093': 'B',
+            'FA050': 'C',
+            'FA150': 'D',
+            'FA092': 'E',
+            'FA173': 'F',
+            'FA189': 'G',
+            'FA089': 'H',
         }
     }
 
@@ -169,7 +181,7 @@ def makeJobArrayScript(jobName_str, example_jobScript, overall_folder, commandLi
 
     return new_job_address
 
-def makeJobSingleScript(jobName_str, example_jobScript, overall_folder, commands, info, verbose):
+def makeJobSingleScript(jobName_str, example_jobScript, overall_folder, commands, info, verbose, Analysis=False):
     '''Create job script to run array of rat macros'''
 
     new_job_address = overall_folder + 'job_scripts/'
@@ -178,7 +190,7 @@ def makeJobSingleScript(jobName_str, example_jobScript, overall_folder, commands
 
     output_logFile_address = overall_folder + 'log_files/'
     output_logFile_address = checkRepo(output_logFile_address, verbose)
-    output_logFile_address +=  'log_' + jobName_str + filename_format(info) + '.txt'
+    output_logFile_address +=  'log_' + jobName_str + filename_format(info, Analysis) + '.txt'
 
     new_jobScript = []
     for line in example_jobScript:
@@ -460,6 +472,8 @@ def combiHists(args, input_info):
             print('Running command: ', command)
         subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
 
+    return True
+
 ### Analysis functions ###
 
 def getOuterLims(region_lims_list, verbose):
@@ -581,6 +595,8 @@ def getStats(args, input_info):
     # Apply region limits from list
     if args.verbose:
         print('Reading in region limits...')
+        print('Make json table!!')
+        exit(1)
     textFile = open(args.region_lims, "r")
     lines = [line.split(', ') for line in textFile]
     textFile.close()
@@ -641,6 +657,73 @@ def getStats(args, input_info):
     return True
 
 
+def getSlopes(args, input_info):
+    '''Compute FOM/abs slopes and red Chi^2 for different region cuts'''
+
+    # Read in example macro and job script
+    repo_address = getRepoAddress()
+
+    # Make sure folders are of the correct format to  use later
+    save_tothists_folder = checkRepo(args.tothist_repo, args.verbose)
+    save_slopes_folder = checkRepo(args.slopes_repo, args.verbose)
+
+    jobSingleScript_address = repo_address + 'job_scripts/jobSingle.job'
+    with open(jobSingleScript_address, "r") as f:
+        example_jobSingleScript = f.readlines()
+
+    # Wait until previous jobs are done
+    checkJobsDone('tot_hists_', input_info, 10, args.verbose)
+
+    # read in region file info
+    textFile = open(args.lim_list_file, "r")
+    lines = [line.replace('\n', '').split(', ') for line in textFile]
+    textFile.close()
+    region_lims = {}
+    for line in lines:
+        # region_lims['fibre'] = 'dir_x_max_min dir_x_max_max ref_x_min_min ref_x_min_max dir_t_cen_min dir_t_cen_max ref_t_cen_min ref_t_cen_max dir_t_wid_min dir_t_wid_max ref_t_wid_min ref_t_wid_max N'
+        region_lims[line[0]] = line[1]
+
+    # Loop through info file, and find find all tot_hist files and info needed for ech fibre
+    line_lims = {}
+    for info in input_info:
+        fibre = info[3]
+        if fibre not in line_lims:
+            line_lims[fibre] = {}
+            line_lims[fibre]['info'] = info
+            line_lims[fibre]['command'] = ''
+        if float(info[5]) == 1.0:
+            line_lims[fibre]['command'] =  info[5] + ' ' + save_tothists_folder + 'tot_hists_' + filename_format(info) + '.root ' + line_lims[fibre]['command']
+        else:
+            line_lims[fibre]['command'] += info[5] + ' ' + save_tothists_folder + 'tot_hists_' + filename_format(info) + '.root '
+
+    # Making job scripts
+    command_base = repo_address + 'scripts/GetFOMabsSlopes.exe ' + save_tothists_folder + ' '
+    command_base += save_slopes_folder + 'slopes_'
+    job_addresses = []
+    for fibre in line_lims:
+        if args.verbose:
+            print('geo_file=', line_lims[fibre]['info'][0], ', inner_av_material=', line_lims[fibre]['info'][1], ', LED=', line_lims[fibre]['info'][2], ', fibre=', line_lims[fibre]['info'][3], ', reemis=', line_lims[fibre]['info'][4])
+        # Make list of command for job to call
+        command = command_base + filename_format(line_lims[fibre]['info'], True) + '.txt ' + str(int(args.verbose)) + ' ' + region_lims[fibre] + ' ' + line_lims[fibre]['command']
+
+        # Create the job script to run all these macros in an array
+        new_job_address = makeJobSingleScript('tot_hists_', example_jobSingleScript, save_tothists_folder, command, line_lims[fibre]['info'], args.verbose, True)
+        job_addresses.append(new_job_address)
+
+    # Wait until these job arrays are done
+    checkJobsDone('tot_hists_', input_info, 10, args.verbose)
+    
+    ### RUN JOB SCRIPTS ###
+    print('Submitting jobs...')
+    for job_address in job_addresses:
+        command = 'qsub ' + job_address
+        if args.verbose:
+            print('Running command: ', command)
+        subprocess.call(command, stdout=subprocess.PIPE, shell=True) # use subprocess to make code wait until it has finished
+
+    return True
+
+
 ### Combined functions ###
 
 def runSims_getHists(args, input_info):
@@ -696,6 +779,7 @@ def main():
         'hist': getHists,
         'combi': combiHists,
         'stats': getStats,
+        'slopes': getSlopes,
 
         'sim-hist': runSims_getHists,
         'hist-combi': getHists_combine,

@@ -55,7 +55,7 @@ void rectangle::Set_x_max(const double& x_max) {
     }
 }
 void rectangle::Set_x_min(const double& x_min) {
-    if (hist_x_min <= x_min) {
+    if (hist_x_min >= x_min) {
         x_min_bin = 1;
     } else {
         x_min_bin = round(0.5 + ((x_min - hist_x_min) / hist_x_bin_size));
@@ -69,7 +69,7 @@ void rectangle::Set_t_max(const double& t_max) {
     }
 }
 void rectangle::Set_t_min(const double& t_min) {
-    if (hist_t_min <= t_min) {
+    if (hist_t_min >= t_min) {
         t_min_bin = 1;
     } else {
         t_min_bin = round(0.5 + ((t_min - hist_t_min) / hist_t_bin_size));
